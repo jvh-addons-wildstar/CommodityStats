@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="boe2" APIVersion="8" Name="CommodityStats" Description="Keep track of prices on the commodity exchange">
+    <Script Name="GeminiLogging.lua" />
+    <Script Name="XmlDocument.lua" />
+    <Script Name="PixiePlot.lua" />
+    <Script Name="inspect.lua" />
+    <Script Name="CommodityStats.lua"/>
+    <Form Name="CommodityStats.xml"/>
+</Addon>
