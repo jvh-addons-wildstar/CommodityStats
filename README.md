@@ -1,6 +1,6 @@
 CommodityStats
 ==============
---Introduction--
+###Introduction
 Commoditystats is a tool for tracking the price history of buy- and sell-orders on the Commodity Exchange, so that information can be used to your advantage. It does so by saving the statistics as often as once every hour and present them to you in a nice graph. It has a scan button to perform a (fast!) scan of all commodity items and a history link on every presented commodity item.
 It currently features:
 * Save the price history of buy/sell orders
@@ -13,7 +13,7 @@ It currently features:
 * Save the scrollbar position between transactions
 * Replace the 4-second blocking confirm/error window with a non-blocking alertbox
 
---How to use?--
+###How to use?
 Just install the addon and you are done. Additionally, you can type /commoditystats to change a few settings. Commoditystats will gather/save statistics on 2 occasions:
 * Simply by browsing the Commodity Exchange. Every item displayed will be saved.
 By using the Scan button. Commoditystats will then request every item of every category. Since this takes a few seconds at most, this is the recommended way.
