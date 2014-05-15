@@ -15,18 +15,22 @@ local clrBuyTop50 = {a=1,r=0.8,g=1,b=0.8}
 local transactionListItems = {}
 
 -- OrderTypes
-CommodityStats.BOTH = 0
-CommodityStats.BUY = 1
-CommodityStats.SELL = 2
+CommodityStats.OrderType = {
+    BOTH = 0,
+    BUY = 1,
+    SELL = 2
+}
 
 -- Transaction results
-CommodityStats.BUYSUCCESS = 0
-CommodityStats.SELLSUCCESS = 1
-CommodityStats.BUYEXPIRED = 2
-CommodityStats.SELLEXPIRED = 3
+CommodityStats.Result = {
+    BUYSUCCESS = 0,
+    SELLSUCCESS = 1,
+    BUYEXPIRED = 2,
+    SELLEXPIRED = 3
+}
 
 -- DateTime formats
-CommodityStats.DateFormats = {
+CommodityStats.DateFormat = {
     DDMM = "%d/%m %H:%M",
     MMDD = "%m/%d %H:%M"
 }
@@ -39,7 +43,7 @@ CommodityStats.Category = {
     BUYNOW = "HeaderBuyNowBtn"
 }
 
--- Undercut options
+-- Price Undercut/Increase strategies
 CommodityStats.Strategy = {
     MATCH = 0,
     FIXED = 1,
@@ -67,13 +71,18 @@ function CommodityStats:new(o)
     self.lastAverageRun = 0
     self.isScanning = false
 
-    self.settings.daysToKeep = 60 --how long do we keep statistics
-    self.settings.daysUntilAverage = 7 --how long until we average hourly stats to daily stats
-    self.settings.dateFormatString = CommodityStats.DateFormats.DDMM
-    self.settings.orderType = CommodityStats.BOTH
-    self.settings.baseSellPrice = CommodityStats.Pricegroup.TOP1
-    self.settings.sellStrategy = CommodityStats.Strategy.MATCH
-    self.settings.lastSelectedTab = nil
+    -- default values
+    self.settings = {
+        daysToKeep = 60,
+        daysUntilAverage = 7,
+        dateFormatString = CommodityStats.DateFormat.DDMM,
+        orderType = CommodityStats.OrderType.BOTH,
+        baseSellPrice = CommodityStats.Pricegroup.TOP1,
+        sellStrategy = CommodityStats.Strategy.MATCH,
+        sellUndercutPercentage = 5,
+        sellUndercutFixed = 100,
+        lastSelectedTab = nil
+    }
 
     return o
 end
@@ -192,27 +201,36 @@ function CommodityStats:GetSelectedCategory(tMarketPlaceCommodity)
 end
 
 function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
-    if selectedCategory == CommodityStats.Category.BUYNOW or selectedCategory == CommodityStats.Category.SELLORDER then
-        local sellPriceGroup = self.settings.sellPriceGroup or CommodityStats.Pricegroup.TOP1
+    if selectedCategory == CommodityStats.Category.SELLORDER or selectedCategory == CommodityStats.Category.BUYNOW then
+        local sellPriceGroup = self.settings.baseSellPrice or CommodityStats.Pricegroup.TOP10
+        local strategy = self.settings.sellStrategy or CommodityStats.Strategy.MATCH
+        if selectedCategory == CommodityStats.Category.BUYNOW then
+            sellPriceGroup = CommodityStats.Pricegroup.TOP1
+            strategy = CommodityStats.Strategy.MATCH
+        end
+
         price = tStats.arSellOrderPrices[sellPriceGroup].monPrice:GetAmount()
-        if selectedCategory == CommodityStats.Category.SELLORDER then
-            if self.settings.defaultUndercut == CommodityStats.Strategy.FIXED then
-                price = price - self.settings.defaultUndercutValue
-            end
-            if self.settings.defaultUndercut == CommodityStats.Strategy.PERCENTAGE then
-                price = price - (price / 100 * self.settings.defaultUndercutPercentage)
-            end
+        if strategy == CommodityStats.Strategy.FIXED then
+            price = price - self.settings.sellUndercutFixed or 0
+            if price < 1 then price = 1 end
+        end
+        if strategy == CommodityStats.Strategy.PERCENTAGE then
+            price = math.floor(price - (price / 100 * self.settings.sellUndercutPercentage or 0))
         end
     else
-        local buyPriceGroup = self.settings.buyPriceGroup or CommodityStats.Pricegroup.TOP1
+        local buyPriceGroup = self.settings.baseBuyPrice or CommodityStats.Pricegroup.TOP10
+        local strategy = self.settings.buyStrategy or CommodityStats.Strategy.MATCH
+        if selectedCategory == CommodityStats.Category.SELLNOW then
+            buyPriceGroup = CommodityStats.Pricegroup.TOP1
+            strategy = CommodityStats.Strategy.MATCH
+        end
+
         price = tStats.arBuyOrderPrices[buyPriceGroup].monPrice:GetAmount()
-        if selectedCategory == CommodityStats.Category.BUYORDER then
-            if self.settings.defaultIncrease == CommodityStats.Strategy.FIXED then
-                price = price + self.settings.defaultIncreaseValue
-            end
-            if self.settings.defaultIncrease == CommodityStats.Strategy.PERCENTAGE then
-                price = price + (price / 100 * self.settings.defaultIncreasePercentage)
-            end
+        if strategy == CommodityStats.Strategy.FIXED then
+            price = price + self.settings.buyIncreaseFixed or 0
+        end
+        if strategy == CommodityStats.Strategy.PERCENTAGE then
+            price = math.floor(price + (price / 100 * self.settings.buyIncreasePercentage or 0))
         end
     end
     return price
@@ -337,12 +355,12 @@ function CommodityStats:LoadStatisticsForm()
     while current <= now do
         local stat = stats[current]
         if stat ~= nil then
-            if self.settings.orderType == CommodityStats.SELL or self.settings.orderType == CommodityStats.BOTH then
+            if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
                 if stat.sellPrices.top1 ~= 0 then table.insert(dsSellTop1.values, { x = current, y = stat.sellPrices.top1 }) end
                 if stat.sellPrices.top10 ~= 0 then table.insert(dsSellTop10.values, { x = current, y = stat.sellPrices.top10 }) end
                 if stat.sellPrices.top50 ~= 0 then table.insert(dsSellTop50.values, { x = current, y = stat.sellPrices.top50 }) end
             end
-            if self.settings.orderType == CommodityStats.BUY or self.settings.orderType == CommodityStats.BOTH then
+            if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
                 if stat.buyPrices.top1 ~= 0 then table.insert(dsBuyTop1.values, { x = current, y = stat.buyPrices.top1 }) end
                 if stat.buyPrices.top10 ~= 0 then table.insert(dsBuyTop10.values, { x = current, y = stat.buyPrices.top10 }) end
                 if stat.buyPrices.top50 ~= 0 then table.insert(dsBuyTop50.values, { x = current, y = stat.buyPrices.top50 }) end
@@ -390,12 +408,12 @@ function CommodityStats:LoadStatisticsForm()
     end)
 
 
-    if self.settings.orderType == CommodityStats.SELL or self.settings.orderType == CommodityStats.BOTH then
+    if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
         self.plot:AddDataSet(dsSellTop1)
         self.plot:AddDataSet(dsSellTop10)
         self.plot:AddDataSet(dsSellTop50)
     end
-    if self.settings.orderType == CommodityStats.BUY or self.settings.orderType == CommodityStats.BOTH then
+    if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
         self.plot:AddDataSet(dsBuyTop1)
         self.plot:AddDataSet(dsBuyTop10)
         self.plot:AddDataSet(dsBuyTop50)
@@ -404,15 +422,15 @@ function CommodityStats:LoadStatisticsForm()
 end
 
 function CommodityStats:GetPlotColors(nOrderType)
-    if nOrderType == CommodityStats.BOTH then
+    if nOrderType == CommodityStats.OrderType.BOTH then
         return {clrSellTop1, clrSellTop10, clrSellTop50, clrBuyTop1, clrBuyTop10, clrBuyTop50 }
     end
 
-    if nOrderType == CommodityStats.SELL then
+    if nOrderType == CommodityStats.OrderType.SELL then
         return {clrSellTop1, clrSellTop10, clrSellTop50 }
     end
 
-    if nOrderType == CommodityStats.BUY then
+    if nOrderType == CommodityStats.OrderType.BUY then
         return {clrBuyTop1, clrBuyTop10, clrBuyTop50 }
     end
 end
@@ -448,9 +466,9 @@ function CommodityStats:EstimateProfits(prices)
 end
 
 function CommodityStats:SetOrderTypeSelection()
-    if self.settings.orderType == CommodityStats.BUY then self.wndStatistics:FindChild("btnBuy"):SetCheck(true) end
-    if self.settings.orderType == CommodityStats.SELL then self.wndStatistics:FindChild("btnSell"):SetCheck(true) end
-    if self.settings.orderType == CommodityStats.BOTH then self.wndStatistics:FindChild("btnBoth"):SetCheck(true) end
+    if self.settings.orderType == CommodityStats.OrderType.BUY then self.wndStatistics:FindChild("btnBuy"):SetCheck(true) end
+    if self.settings.orderType == CommodityStats.OrderType.SELL then self.wndStatistics:FindChild("btnSell"):SetCheck(true) end
+    if self.settings.orderType == CommodityStats.OrderType.BOTH then self.wndStatistics:FindChild("btnBoth"):SetCheck(true) end
 end
 
 function CommodityStats:GetValueBoundaries(t)
@@ -465,12 +483,12 @@ function CommodityStats:GetValueBoundaries(t)
 	            earliest = timestamp
 	        end
 
-	        if self.settings.orderType == CommodityStats.SELL or self.settings.orderType == CommodityStats.BOTH then
+	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
 	            if data.sellPrices.top1 > maxPrice then maxPrice = data.sellPrices.top1 end
 	            if data.sellPrices.top10 > maxPrice then maxPrice = data.sellPrices.top10 end
 	            if data.sellPrices.top50 > maxPrice then maxPrice = data.sellPrices.top50 end
 	        end
-	        if self.settings.orderType == CommodityStats.BUY or self.settings.orderType == CommodityStats.BOTH then
+	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
 	            if data.buyPrices.top1 > maxPrice then maxPrice = data.buyPrices.top1 end
 	            if data.buyPrices.top10 > maxPrice then maxPrice = data.buyPrices.top10 end
 	            if data.buyPrices.top50 > maxPrice then maxPrice = data.buyPrices.top50 end
@@ -478,12 +496,12 @@ function CommodityStats:GetValueBoundaries(t)
 
 	        minPrice = maxPrice
 
-	        if self.settings.orderType == CommodityStats.SELL or self.settings.orderType == CommodityStats.BOTH then
+	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
 	            if data.sellPrices.top1 < minPrice and data.sellPrices.top1 ~= 0 then minPrice = data.sellPrices.top1 end
 	            if data.sellPrices.top10 < minPrice and data.sellPrices.top10 ~= 0 then minPrice = data.sellPrices.top10 end
 	            if data.sellPrices.top50 < minPrice and data.sellPrices.top50 ~= 0 then minPrice = data.sellPrices.top50 end
 	        end
-	        if self.settings.orderType == CommodityStats.BUY or self.settings.orderType == CommodityStats.BOTH then
+	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
 	            if data.buyPrices.top1 < minPrice and data.buyPrices.top1 ~= 0 then minPrice = data.buyPrices.top1 end
 	            if data.buyPrices.top10 < minPrice and data.buyPrices.top10 ~= 0 then minPrice = data.buyPrices.top10 end
 	            if data.buyPrices.top50 < minPrice and data.buyPrices.top50 ~= 0 then minPrice = data.buyPrices.top50 end
@@ -559,21 +577,32 @@ function CommodityStats:LoadConfigForm()
     end
     self.wndConfig = Apollo.LoadForm(self.Xml, "ConfigForm", self.wndMain, self)
 
+    -- history settings
     self.wndConfig:FindChild("txtStatisticsAge"):SetText(tostring(self.settings.daysToKeep))
     self.wndConfig:FindChild("txtStatisticsAverage"):SetText(tostring(self.settings.daysUntilAverage))
-    self.wndConfig:FindChild("txtCustomDateTime"):SetText(self.settings.dateFormatString)
 
-    if self.settings.dateFormatString == CommodityStats.DateFormats.DDMM then
+    -- date format settings
+    self.wndConfig:FindChild("txtCustomDateTime"):SetText(self.settings.dateFormatString)
+    if self.settings.dateFormatString == CommodityStats.DateFormat.DDMM then
         self.wndConfig:FindChild("chkddmmyyyy"):SetCheck(true)
-    elseif self.settings.dateFormatString == CommodityStats.DateFormats.MMDD then
+    elseif self.settings.dateFormatString == CommodityStats.DateFormat.MMDD then
         self.wndConfig:FindChild("chkmmddyyyy"):SetCheck(true)
     else
         self.wndConfig:FindChild("chkCustom"):SetCheck(true)
         self.wndConfig:FindChild("CustomDateTimeContainer"):Show(true)
     end
 
+    -- sellorder pricing
     self:SetSelectedBaseSellPrice()
     self:SetSelectedSellStrategy()
+    self.wndConfig:FindChild("txtUndercutPercentage"):SetText(tostring(self.settings.sellUndercutPercentage or 0))
+    self.wndConfig:FindChild("monSellUndercutFixed"):SetAmount(self.settings.sellUndercutFixed or 0)
+    -- buyorder pricing
+    self:SetSelectedBaseBuyPrice()
+    self:SetSelectedBuyStrategy()
+    self.wndConfig:FindChild("txtIncreasePercentage"):SetText(tostring(self.settings.buyIncreasePercentage or 0))
+    self.wndConfig:FindChild("monBuyIncreaseFixed"):SetAmount(self.settings.buyIncreaseFixed or 0)
+
     self.wndConfig:Show(true)
 end
 
@@ -694,13 +723,13 @@ function CommodityStats:OnMailboxOpen()
         local itemID, transaction
         if info.strSenderName == "Phineas T. Rotostar" and info.strSubject:lower():find("commodity") and info.bIsRead == false then
             if info.strBody:lower():find("seller has been found") then
-                itemID, transaction = processTransaction(info, CommodityStats.BUYSUCCESS)
+                itemID, transaction = processTransaction(info, CommodityStats.Result.BUYSUCCESS)
             elseif info.strBody:lower():find("buyer has been found") then
-                itemID, transaction = processTransaction(info, CommodityStats.SELLSUCCESS)
+                itemID, transaction = processTransaction(info, CommodityStats.Result.SELLSUCCESS)
             elseif info.strBody:lower():find("buy order") then
-                itemID, transaction = processTransaction(info, CommodityStats.BUYEXPIRED)
+                itemID, transaction = processTransaction(info, CommodityStats.Result.BUYEXPIRED)
             elseif info.strBody:lower():find("sell order") then
-                itemID, transaction = processTransaction(info, CommodityStats.SELLEXPIRED)
+                itemID, transaction = processTransaction(info, CommodityStats.Result.SELLEXPIRED)
             end
             if transaction ~= nil and itemID ~= nil then
                 if self.transactions[itemID] == nil then self.transactions[itemID] = {} end
@@ -731,11 +760,11 @@ function CommodityStats:DisplayTransactions(itemID)
     else
         if self.transactions[itemID] ~= nil then
             for i, transaction in ipairs(self.transactions[itemID]) do
-                if transaction.result == CommodityStats.BUYSUCCESS then 
+                if transaction.result == CommodityStats.Result.BUYSUCCESS then 
                     buyQuantity = buyQuantity + transaction.quantity
                     buyTotal = buyTotal + (transaction.quantity * transaction.price)
                 end
-                if transaction.result == CommodityStats.SELLSUCCESS then
+                if transaction.result == CommodityStats.Result.SELLSUCCESS then
                     sellQuantity = sellQuantity + transaction.quantity
                     sellTotal = sellTotal + (transaction.quantity * transaction.price)
                 end
@@ -765,10 +794,10 @@ end
 
 function CommodityStats:AddTransactionItem(wndTarget, itemID, transaction)
     local result = ""
-    if transaction.result == CommodityStats.BUYSUCCESS then result = "Buy success" end
-    if transaction.result == CommodityStats.SELLSUCCESS then result = "Sell success" end
-    if transaction.result == CommodityStats.BUYEXPIRED then result = "Buy expired" end
-    if transaction.result == CommodityStats.SELLEXPIRED then result = "Sell expired" end
+    if transaction.result == CommodityStats.Result.BUYSUCCESS then result = "Buy success" end
+    if transaction.result == CommodityStats.Result.SELLSUCCESS then result = "Sell success" end
+    if transaction.result == CommodityStats.Result.BUYEXPIRED then result = "Buy expired" end
+    if transaction.result == CommodityStats.Result.SELLEXPIRED then result = "Sell expired" end
     local wndTransaction = Apollo.LoadForm(self.Xml, "TransactionItem", wndTarget, self)
     wndTransaction:FindChild("txtDate"):SetText(os.date(self.settings.dateFormatString, transaction.timestamp))
     wndTransaction:FindChild("txtQuantity"):SetText(tostring(transaction.quantity))
@@ -781,7 +810,7 @@ function processTransaction(info, transactionresult)
     glog:info("Processing mail with subject '" .. info.strSubject .."'. Transactionresult: " .. tostring(transactionresult) .. ".")
     local transaction = { result = transactionresult }
     local quantity, name, price, unit
-    if transactionresult == CommodityStats.BUYSUCCESS or transactionresult == CommodityStats.SELLSUCCESS then
+    if transactionresult == CommodityStats.Result.BUYSUCCESS or transactionresult == CommodityStats.Result.SELLSUCCESS then
         quantity, name, price, unit = string.match(info.strBody, '(%d+)[^%s](.-)%.?\n?\r?\n.-(%d+)(.-)\r?\n')
     else
         quantity, name, price = string.match(info.strBody, 'for (%d+)[^%s](.-)at%s(%d+)')
@@ -918,9 +947,9 @@ end
 
 function CommodityStats:OnSelectAuctionType( wndHandler, wndControl, eMouseButton )
     local name = wndControl:GetName()
-    if name == "btnBuy" then self.settings.orderType = CommodityStats.BUY end
-    if name == "btnSell" then self.settings.orderType = CommodityStats.SELL end
-    if name == "btnBoth" then self.settings.orderType = CommodityStats.BOTH end
+    if name == "btnBuy" then self.settings.orderType = CommodityStats.OrderType.BUY end
+    if name == "btnSell" then self.settings.orderType = CommodityStats.OrderType.SELL end
+    if name == "btnBoth" then self.settings.orderType = CommodityStats.OrderType.BOTH end
     self:LoadStatisticsForm()
 end
 
@@ -1010,6 +1039,41 @@ function CommodityStats:SetSelectedSellStrategy()
     self.wndConfig:FindChild(buttonName):SetCheck(true)
 end
 
+function CommodityStats:SetSelectedBaseBuyPrice()
+    local buttonText = "undefined"
+    if self.settings.baseBuyPrice == nil then self.settings.baseBuyPrice = CommodityStats.Pricegroup.TOP1 end
+    
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP1 then buttonText = "top 1 buy price" end
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP10 then buttonText = "top 10 buy price" end
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP50 then buttonText = "top 50 buy price" end
+
+    self.wndConfig:FindChild("txtBaseBuyPrice"):SetText(buttonText)
+end
+
+function CommodityStats:SetSelectedBuyStrategy()
+    local buttonName = ""
+    if self.settings.buyStrategy == nil then self.settings.buyStrategy = CommodityStats.Strategy.MATCH end
+    if self.settings.buyStrategy == CommodityStats.Strategy.MATCH then buttonName = "rboBuyPriceStrategyMatch" end
+    if self.settings.buyStrategy == CommodityStats.Strategy.PERCENTAGE then
+        buttonName = "rboBuyPriceStrategyPercentage"
+        self.wndConfig:FindChild("IncreasePercentageContainer"):Show(true)
+    end
+    if self.settings.buyStrategy == CommodityStats.Strategy.FIXED then
+        buttonName = "rboBuyPriceStrategyFixed"
+        self.wndConfig:FindChild("IncreaseFixedContainer"):Show(true)
+    end
+    self.wndConfig:FindChild(buttonName):SetCheck(true)
+end
+
+function CommodityStats:ShowMessage(messages)
+    local tParameters= {
+        iWindowType = GameLib.CodeEnumStoryPanel.Center,
+        tLines = messages,
+        nDisplayLength = 3
+    }
+    MessageManagerLib.DisplayStoryPanel(tParameters)
+end
+
 ---------------------------------------------------------------------------------------------------
 -- ConfigForm Functions
 ---------------------------------------------------------------------------------------------------
@@ -1017,11 +1081,11 @@ end
 function CommodityStats:OnSelectDateFormat( wndHandler, wndControl, eMouseButton )
     local controlname = wndControl:GetName()
     if controlname == "chkddmmyyyy" then 
-        self.settings.dateFormatString = CommodityStats.DateFormats.DDMM
+        self.settings.dateFormatString = CommodityStats.DateFormat.DDMM
         self.wndConfig:FindChild("CustomDateTimeContainer"):Show(false)
     end
     if controlname == "chkmmddyyyy" then 
-        self.settings.dateFormatString = CommodityStats.DateFormats.MMDD
+        self.settings.dateFormatString = CommodityStats.DateFormat.MMDD
         self.wndConfig:FindChild("CustomDateTimeContainer"):Show(false)
     end
     if controlname == "chkCustom" then
@@ -1072,9 +1136,76 @@ function CommodityStats:OnSelectSellpriceStrategy( wndHandler, wndControl, eMous
 end
 
 function CommodityStats:btnSaveSellUndercutPercentage( wndHandler, wndControl, eMouseButton )
+    local input = tonumber(self.wndConfig:FindChild("txtUndercutPercentage"):GetText())
+    if input ~= nil then
+        if input >= 0 and input <= 100 then
+            self.settings.sellUndercutPercentage = input
+            self:ShowMessage({"Value successfully saved"})
+            return
+        end
+    end
+    self:ShowMessage( { "Input not valid, percentage not saved", "Please enter a numeric value between 0 and 100" })
 end
 
 function CommodityStats:btnSaveSellUndercutFixed( wndHandler, wndControl, eMouseButton )
+    local input = self.wndConfig:FindChild("monSellUndercutFixed"):GetAmount()
+    self.settings.sellUndercutFixed = input
+    self:ShowMessage({"Value successfully saved"})
+end
+
+function CommodityStats:OnBaseBuypriceDropDown( wndHandler, wndControl, eMouseButton )
+    self.wndConfig:FindChild("BaseBuyPriceContainer"):Show(true)    
+    wndControl:SetCheck(true)
+end
+
+function CommodityStats:OnBaseBuypriceChecked( wndHandler, wndControl, eMouseButton )
+    local selectedButton = self.wndConfig:FindChild("BaseBuyPriceContainer"):GetRadioSelButton("BaseBuyPrice"):GetName()
+    local priceGroup = self.settings.baseBuyPrice or CommodityStats.Pricegroup.TOP1
+    if selectedButton == "btnBaseBuyPrice1" then priceGroup = CommodityStats.Pricegroup.TOP1 end
+    if selectedButton == "btnBaseBuyPrice10" then priceGroup = CommodityStats.Pricegroup.TOP10 end
+    if selectedButton == "btnBaseBuyPrice50" then priceGroup = CommodityStats.Pricegroup.TOP50 end
+
+    self.settings.baseBuyPrice = priceGroup
+    self:SetSelectedBaseBuyPrice()
+
+    self.wndConfig:FindChild("btnDropBaseBuyPrice"):SetCheck(false)
+    self.wndConfig:FindChild("BaseBuyPriceContainer"):Show(false)
+end
+
+function CommodityStats:OnSelectBuypriceStrategy( wndHandler, wndControl, eMouseButton )
+    self.wndConfig:FindChild("IncreasePercentageContainer"):Show(false)
+    self.wndConfig:FindChild("IncreaseFixedContainer"):Show(false)
+    local buyStrategy = self.settings.buyStrategy
+    local selectedButton = self.wndConfig:FindChild("BuyPriceStrategyContainer"):GetRadioSelButton("BuyPriceStrategy"):GetName()
+    if selectedButton == "rboBuyPriceStrategyMatch" then buyStrategy = CommodityStats.Strategy.MATCH end
+    if selectedButton == "rboBuyPriceStrategyPercentage" then
+        buyStrategy = CommodityStats.Strategy.PERCENTAGE
+        self.wndConfig:FindChild("IncreasePercentageContainer"):Show(true)
+    end
+    if selectedButton == "rboBuyPriceStrategyFixed" then
+        buyStrategy = CommodityStats.Strategy.FIXED
+        self.wndConfig:FindChild("IncreaseFixedContainer"):Show(true)
+    end
+
+    self.settings.buyStrategy = buyStrategy
+end
+
+function CommodityStats:btnSaveBuyIncreasePercentage( wndHandler, wndControl, eMouseButton )
+    local input = tonumber(self.wndConfig:FindChild("txtIncreasePercentage"):GetText())
+    if input ~= nil then
+        if input >= 0 and input <= 100 then
+            self.settings.buyIncreasePercentage = input
+            self:ShowMessage({"Value successfully saved"})
+            return
+        end
+    end
+    self:ShowMessage( { "Input not valid, percentage not saved", "Please enter a numeric value between 0 and 100" })
+end
+
+function CommodityStats:btnSaveBuyIncreaseFixed( wndHandler, wndControl, eMouseButton )
+    local input = self.wndConfig:FindChild("monBuyIncreaseFixed"):GetAmount()
+    self.settings.buyIncreaseFixed = input
+    self:ShowMessage({"Value successfully saved"})
 end
 
 local CommodityStatsInst = CommodityStats:new()
