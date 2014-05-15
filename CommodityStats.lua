@@ -81,6 +81,10 @@ function CommodityStats:new(o)
         sellStrategy = CommodityStats.Strategy.MATCH,
         sellUndercutPercentage = 5,
         sellUndercutFixed = 100,
+        baseBuyPrice = CommodityStats.Pricegroup.TOP1,
+        buyStrategy = CommodityStats.Strategy.MATCH,
+        buyIncreasePercentage = 5,
+        buyIncreaseFixed = 100,
         lastSelectedTab = nil
     }
 
@@ -156,7 +160,7 @@ function CommodityStats:InitializeHooks()
             end
         end
         if price == 0 then
-            price = CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
+            price = self:GetPrice(nItemId, tStats, selectedCategory)
         end
         wndMatch:FindChild("ListInputPrice"):SetAmount(price)
         wndMatch:FindChild("ListSubmitBtn"):Enable(price > 0)
@@ -201,6 +205,8 @@ function CommodityStats:GetSelectedCategory(tMarketPlaceCommodity)
 end
 
 function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
+    local price = 0
+    SendVarToRover("settings", self.settings)
     if selectedCategory == CommodityStats.Category.SELLORDER or selectedCategory == CommodityStats.Category.BUYNOW then
         local sellPriceGroup = self.settings.baseSellPrice or CommodityStats.Pricegroup.TOP10
         local strategy = self.settings.sellStrategy or CommodityStats.Strategy.MATCH
@@ -208,7 +214,6 @@ function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
             sellPriceGroup = CommodityStats.Pricegroup.TOP1
             strategy = CommodityStats.Strategy.MATCH
         end
-
         price = tStats.arSellOrderPrices[sellPriceGroup].monPrice:GetAmount()
         if strategy == CommodityStats.Strategy.FIXED then
             price = price - self.settings.sellUndercutFixed or 0
@@ -270,7 +275,7 @@ function CommodityStats:CreateCommodityStat(tStats)
     stat.sellPrices = {}
     stat.sellPrices.top1 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP1].monPrice:GetAmount()
     stat.sellPrices.top10 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP10].monPrice:GetAmount()
-    stat.sellPrices.top50 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP50].monPrice:GetAmount()
+stat.sellPrices.top50 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP50].monPrice:GetAmount()
     return stat
 end
 
@@ -278,11 +283,13 @@ function CommodityStats:OnSave(eLevel)
     if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Realm then
         return nil
     end 
-    local save = {}
-    save.statistics = self.statistics
-    save.transactions = self.transactions
-    save.settings = self.settings
-    save.lastAverageRun = self.lastAverageRun
+
+    local save = {
+        statistics = self.statistics,
+        transactions = self.transactions,
+        settings = self.settings,
+        lastAverageRun = self.lastAverageRun
+    }
 
     -- save window positions
     local mainPosLeft, mainPosTop = self.wndMain:GetPos()
@@ -890,10 +897,9 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
             self:DisplayTransactions()
             return
         end
-    else
-        self.wndMain:Show(true)
-        self:OnTabSelected(nil, nil, nil, true)
     end
+    self.wndMain:Show(true)
+    self:OnTabSelected(nil, nil, nil, true)
 end
 
 function CommodityStats:OnSettingsSave(wndHandler, wndControl, eMouseButton)
@@ -1067,7 +1073,7 @@ end
 
 function CommodityStats:ShowMessage(messages)
     local tParameters= {
-        iWindowType = GameLib.CodeEnumStoryPanel.Center,
+        iWindowType = GameLib.CodeEnumStoryPanel.Informational,
         tLines = messages,
         nDisplayLength = 3
     }
