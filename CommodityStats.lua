@@ -727,7 +727,7 @@ function CommodityStats:OnMailboxOpen()
     for i, mail in pairs(mails) do
         local info = mail:GetMessageInfo()
         local itemID, transaction
-        if info.strSenderName == "Phineas T. Rotostar" and info.strSubject:lower():find("commodity") and info.bIsRead == false then
+        if info.eSenderType == MailSystemLib.EmailType_CommodityAuction and info.bIsRead == false then
             if info.strBody:lower():find("seller has been found") then
                 itemID, transaction = processTransaction(info, CommodityStats.Result.BUYSUCCESS)
             elseif info.strBody:lower():find("buyer has been found") then
