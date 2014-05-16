@@ -110,7 +110,7 @@ function CommodityStats:OnLoad()
     })
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
-    self.wndMain = Apollo.LoadForm(self.Xml, "MainForm", nil, self)
+    self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self:InitializeHooks()
@@ -151,12 +151,14 @@ function CommodityStats:InitializeHooks()
         end
 
         local price = 0
+        local hasPreviousQuantity
         local selectedCategory = self:GetSelectedCategory(tMarketPlaceCommodity);
         if self[selectedCategory] ~= nil then -- do we have previously saved prices/quantities?
             scrollContainer:SetVScrollPos(self[selectedCategory].lastScrollPos)
             if self[selectedCategory].lastItemID == nItemId then
                 price = self[selectedCategory].lastPricePerUnit:GetAmount()
                 wndMatch:FindChild("ListInputNumber"):SetText(self[selectedCategory].lastQuantity)
+                hasPreviousQuantity = true
             end
         end
         if price == 0 then
@@ -164,6 +166,14 @@ function CommodityStats:InitializeHooks()
         end
         wndMatch:FindChild("ListInputPrice"):SetAmount(price)
         wndMatch:FindChild("ListSubmitBtn"):Enable(price > 0)
+
+        if self.settings.autoQuantity and not hasPreviousQuantity and (selectedCategory == CommodityStats.Category.SELLORDER or selectedCategory == CommodityStats.Category.SELLNOW) then
+            local maxOrder = MarketplaceLib.kMaxCommodityOrder
+            local sellQuantity = wndMatch:FindChild("ListCount"):GetData() or 0
+            if sellQuantity > maxOrder then sellQuantity = maxOrder end
+            wndMatch:FindChild("ListInputNumber"):SetText(sellQuantity)
+            tMarketPlaceCommodity:OnListInputNumberHelper(wndMatch, sellQuantity)
+        end
     end
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
     self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
@@ -329,7 +339,7 @@ function CommodityStats:LoadStatisticsForm()
     if self.wndStatistics ~= nil then
         self.wndStatistics:Destroy()
     end
-    self.wndStatistics = Apollo.LoadForm(self.Xml, "StatisticsForm", self.wndMain, self)
+    self.wndStatistics = Apollo.LoadForm(self.Xml, "StatisticsForm", self.wndMain:FindChild("MainForm"), self)
     self:DrawColorNotes()
     self:SetOrderTypeSelection()
     self.plot = PixiePlot:New(self.wndStatistics:FindChild("Plot"))
@@ -573,7 +583,7 @@ function CommodityStats:LoadTransactionsForm()
     if self.wndTransactions ~= nil then
         self.wndTransactions:Destroy()
     end
-    self.wndTransactions = Apollo.LoadForm(self.Xml, "TransactionsForm", self.wndMain, self)
+    self.wndTransactions = Apollo.LoadForm(self.Xml, "TransactionsForm", self.wndMain:FindChild("MainForm"), self)
     self:DisplayTransactions(self.currentItemID)
 end
 
@@ -581,7 +591,7 @@ function CommodityStats:LoadConfigForm()
     if self.wndConfig ~= nil then
         self.wndConfig:Destroy()
     end
-    self.wndConfig = Apollo.LoadForm(self.Xml, "ConfigForm", self.wndMain, self)
+    self.wndConfig = Apollo.LoadForm(self.Xml, "ConfigForm", self.wndMain:FindChild("MainForm"), self)
 
     -- history settings
     self.wndConfig:FindChild("txtStatisticsAge"):SetText(tostring(self.settings.daysToKeep))
@@ -603,6 +613,7 @@ function CommodityStats:LoadConfigForm()
     self:SetSelectedSellStrategy()
     self.wndConfig:FindChild("txtUndercutPercentage"):SetText(tostring(self.settings.sellUndercutPercentage or 0))
     self.wndConfig:FindChild("monSellUndercutFixed"):SetAmount(self.settings.sellUndercutFixed or 0)
+    self.wndConfig:FindChild("chkAutoQuantity"):SetCheck(self.settings.autoQuantity)
     -- buyorder pricing
     self:SetSelectedBaseBuyPrice()
     self:SetSelectedBuyStrategy()
@@ -860,7 +871,7 @@ function singularize(s)
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser",
-                    "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire "}
+                    "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
@@ -1101,6 +1112,7 @@ end
 function CommodityStats:OnSetCustomDateTimeFormat( wndHandler, wndControl, eMouseButton )
     local formatstring = self.wndConfig:FindChild("txtCustomDateTime"):GetText()
     self.settings.dateFormatString = formatstring
+    self:ShowMessage({"Custom format successfully saved"})
 end
 
 function CommodityStats:OnBaseSellpriceDropDown( wndHandler, wndControl, eMouseButton )
@@ -1213,5 +1225,10 @@ function CommodityStats:btnSaveBuyIncreaseFixed( wndHandler, wndControl, eMouseB
     self:ShowMessage({"Value successfully saved"})
 end
 
+function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButton )
+    self.settings.autoQuantity = wndControl:IsChecked()
+end
+
 local CommodityStatsInst = CommodityStats:new()
 CommodityStatsInst:Init()
+
