@@ -174,23 +174,26 @@ function CommodityStats:InitializeHooks()
             wndMatch:FindChild("ListInputNumber"):SetText(sellQuantity)
             tMarketPlaceCommodity:OnListInputNumberHelper(wndMatch, sellQuantity)
         end
+
+        -- Add an extra invisible window to the Submit button so that we can intercept the click event on an otherwise protected ActionConfirmButton
+        local listSubmitBtn = wndMatch:FindChild("ListSubmitBtn")
+        Apollo.LoadForm(self.Xml, "ListSubmitButtonOverlay", listSubmitBtn, self)
     end
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
     self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
         local tParameters= { iWindowType = GameLib.CodeEnumStoryPanel.Center, tLines = { strMessage }, nDisplayLength = nDuration }
         MessageManagerLib.DisplayStoryPanel(tParameters)
     end
-    -- save the price/quantity of the last player transaction so we can reuse it
-    local oldOnListSubmitBtn = self.MarketplaceCommodity.OnListSubmitBtn
-    self.MarketplaceCommodity.OnListSubmitBtn = function (tMarketPlaceCommodity, wndHandler, wndControl)
-        self:SaveLastUsedParams(tMarketPlaceCommodity, wndHandler)
-        oldOnListSubmitBtn(tMarketPlaceCommodity, wndHandler, wndControl)
-    end
+
     -- Fix the error that occurs when you empty the quantity box
     local fnOldOnListInputNumberHelper = self.MarketplaceCommodity.OnListInputNumberHelper
     self.MarketplaceCommodity.OnListInputNumberHelper = function(tMarketPlaceCommodity, wndParent, nNewValue)
         fnOldOnListInputNumberHelper(tMarketPlaceCommodity, wndParent, nNewValue or 0)
     end
+end
+
+function CommodityStats:OnListSubmitBtn( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY )
+    self:SaveLastUsedParams(self.MarketplaceCommodity, wndHandler:GetParent())
 end
 
 function CommodityStats:SaveLastUsedParams(tMarketPlaceCommodity, wndHandler)
@@ -870,7 +873,7 @@ function singularize(s)
     -- We need the singular form in order to actually find the item ID.
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate",
-                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser",
+                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "stoutroot",
                     "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
     s = s:lower()
     for i, word in pairs(words) do
@@ -1229,6 +1232,6 @@ function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButt
     self.settings.autoQuantity = wndControl:IsChecked()
 end
 
+
 local CommodityStatsInst = CommodityStats:new()
 CommodityStatsInst:Init()
-
