@@ -12,6 +12,7 @@ local clrSellTop50 = {a=1,r=1,g=0.8,b=0.8}
 local clrBuyTop1 = {a=1,r=0,g=1,b=0}
 local clrBuyTop10 = {a=1,r=0.5,g=1,b=0.5}
 local clrBuyTop50 = {a=1,r=0.8,g=1,b=0.8}
+local CREDDid = "999999"
 local transactionListItems = {}
 
 -- OrderTypes
@@ -92,10 +93,11 @@ function CommodityStats:new(o)
 end
 
 function CommodityStats:Init()
-    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "Gemini:Logging-1.2"})
+    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2"})
     Apollo.RegisterEventHandler("MailBoxActivate", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("ToggleMailWindow", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResults", self)
+    Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
     Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
     Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
 end
@@ -104,7 +106,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     local GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.WARN,
+        level = GeminiLogging.DEBUG,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -113,12 +115,21 @@ function CommodityStats:OnLoad()
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
+    self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
     self:InitializeHooks()
 end
 
 function CommodityStats:InitializeHooks()
+    local fnOldCREDDinitialize = self.MarketplaceCREDD.Initialize
+    -- Add statistics button to CREDD Exchange
+    self.MarketplaceCREDD.Initialize = function(tMarketPlaceCREDD)
+        fnOldCREDDinitialize(tMarketPlaceCREDD)
+        if self.CREDDStatButton ~= nil then self.CREDDStatButton:Destroy() end
+        self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", tMarketPlaceCREDD.wndMain:FindChild("ActLater"), self)
+    end
+
     local fnOldInitialize = self.MarketplaceCommodity.Initialize
-    -- Add scanbutton
+    -- Add scanbutton to Commodity Exchange
     self.MarketplaceCommodity.Initialize = function(tMarketPlaceCommodity)
         fnOldInitialize(tMarketPlaceCommodity)
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
@@ -127,6 +138,8 @@ function CommodityStats:InitializeHooks()
         if self.commPosition ~= nil then
             tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
         end
+        -- Get CREDD info separately since it's not part of the CX, but we want the history on it.
+        CREDDExchangeLib.RequestExchangeInfo()
     end
     -- Add statistics button to every listed commodity item
     local fnOldHeaderBtnToggle = self.MarketplaceCommodity.OnHeaderBtnToggle
@@ -272,6 +285,21 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
             self.ScanButton:SetText("Finished!")
             self.ScanButton:Enable(true)
             self.isScanning = false
+        end
+    end
+end
+
+function CommodityStats:OnCREDDExchangeInfoResults(arMarketStats, arOrders)
+    glog:debug("Received CREDD info")
+    local stat = self:CreateCommodityStat(arMarketStats)
+    if stat.buyOrderCount ~= 0 or stat.sellOrderCount ~= 0 then
+        if self.statistics[CREDDid] == nil then
+            self.statistics[CREDDid] = {}
+        end
+        local timestamp = GetTime()
+        stat.time = timestamp
+        if self.statistics[CREDDid][timestamp] == nil then
+            self.statistics[CREDDid][timestamp] = stat
         end
     end
 end
@@ -956,11 +984,20 @@ function CommodityStats:OnRequestStatistics( wndHandler, wndControl, eMouseButto
     end
     self.wndMain:Show(true)
     self.wndMain:ToFront()
-    self.currentItemID = tonumber(itemID)
-    local item = Item.GetDataFromId(self.currentItemID)
-    glog:info("Statistics requested for " .. item:GetName())
-    self.wndMain:FindChild("txtItemID"):SetText(tostring(itemID))
-    self.wndMain:FindChild("txtTitle"):SetText(item:GetName())
+    if itemID ~= "ActLater" then
+        self.currentItemID = tonumber(itemID)
+        local item = Item.GetDataFromId(self.currentItemID)
+        glog:info("Statistics requested for " .. item:GetName())
+        self.wndMain:FindChild("txtItemID"):SetText(tostring(itemID))
+        self.wndMain:FindChild("txtTitle"):SetText(item:GetName())
+    else
+        -- This is CREDD
+        self.currentItemID = CREDDid
+        glog:info("Statistics requested for CREDD")
+        self.wndMain:FindChild("txtItemID"):SetText(tostring(CREDDid))
+        self.wndMain:FindChild("txtTitle"):SetText("C.R.E.D.D.")
+
+    end
     self:OnTabSelected()
 end
 
