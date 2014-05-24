@@ -177,8 +177,10 @@ function CommodityStats:InitializeHooks()
         if price == 0 then
             price = self:GetPrice(nItemId, tStats, selectedCategory)
         end
+
+        local listSubmitBtn = wndMatch:FindChild("ListSubmitBtn")
         wndMatch:FindChild("ListInputPrice"):SetAmount(price)
-        wndMatch:FindChild("ListSubmitBtn"):Enable(price > 0)
+        listSubmitBtn:Enable(price > 0)
 
         if self.settings.autoQuantity and not hasPreviousQuantity and (selectedCategory == CommodityStats.Category.SELLORDER or selectedCategory == CommodityStats.Category.SELLNOW) then
             local maxOrder = MarketplaceLib.kMaxCommodityOrder
@@ -189,7 +191,6 @@ function CommodityStats:InitializeHooks()
         end
 
         -- Add an extra invisible window to the Submit button so that we can intercept the click event on an otherwise protected ActionConfirmButton
-        local listSubmitBtn = wndMatch:FindChild("ListSubmitBtn")
         Apollo.LoadForm(self.Xml, "ListSubmitButtonOverlay", listSubmitBtn, self)
     end
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
@@ -206,7 +207,18 @@ function CommodityStats:InitializeHooks()
 end
 
 function CommodityStats:OnListSubmitBtn( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY )
-    self:SaveLastUsedParams(self.MarketplaceCommodity, wndHandler:GetParent())
+    -- Save the last used params and scrollposition
+    local containername = self:GetSelectedCategory(self.MarketplaceCommodity)
+    wndHandler = wndHandler:GetParent()
+    if containername ~= nil then
+        local tCurrItem = wndHandler:GetData()[1]
+        local wndParent = wndHandler:GetData()[2]
+        self[containername] = {}
+        self[containername].lastItemID = tCurrItem:GetItemId()
+        self[containername].lastPricePerUnit = wndParent:FindChild("ListInputPrice"):GetCurrency()
+        self[containername].lastQuantity = wndParent:FindChild("ListInputNumber"):GetText()
+        self[containername].lastScrollPos = self.MarketplaceCommodity.wndMain:FindChild("MainScrollContainer"):GetVScrollPos()
+    end
 end
 
 function CommodityStats:SaveLastUsedParams(tMarketPlaceCommodity, wndHandler)
