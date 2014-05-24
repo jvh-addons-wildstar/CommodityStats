@@ -106,7 +106,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     local GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.DEBUG,
+        level = GeminiLogging.WARN,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -450,7 +450,7 @@ function CommodityStats:LoadStatisticsForm()
     self.plot:SetOption("nYValueLabels", 5)
     self.plot:SetOption("xValueFormatter", function(value) return os.date(self.settings.dateFormatString, value) end)
     self.plot:SetOption("yValueFormatter", function(value) return FormatMoney(value) end)
-    self.plot:SetOption("fXValueLabelTilt", 60)
+    self.plot:SetOption("fXValueLabelTilt", 45)
     self.plot:SetOption("fYValueLabelTilt", 60)
     self.plot:SetOption("bWndOverlays", true)
     self.plot:SetOption("fWndOverlaySize", 15)
@@ -912,7 +912,7 @@ function singularize(s)
     -- Auction mails pluralize certain item names if multiple items were bought/sold.
     -- We need the singular form in order to actually find the item ID.
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
-    local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate",
+    local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "stoutroot",
                     "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
     s = s:lower()
@@ -1059,8 +1059,9 @@ function CommodityStats:OnTransactionHover( wndHandler, wndControl, x, y )
 		self.selectionBox = Apollo.LoadForm(self.Xml, "TransactionItemSelector", self.wndTransactions:FindChild("ItemList"), self)
         self.selectionBox:ToFront()
 	end
+    local scrollPos = wndControl:GetParent():GetVScrollPos()
     local posLeft, posTop = wndHandler:GetPos()
-    self.selectionBox:Move(posLeft, posTop, wndHandler:GetWidth(), wndHandler:GetHeight())
+    self.selectionBox:Move(posLeft, posTop + scrollPos, wndHandler:GetWidth() - 20 , wndHandler:GetHeight())
 end
 
 ---------------------------------------------------------------------------------------------------
