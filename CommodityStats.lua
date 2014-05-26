@@ -1,7 +1,7 @@
 -- Got questions/comments? contact me at jimmy@boe2.be or send me a message through Curse
 require "Window"
  
-local PixiePlot, glog
+local PixiePlot, GeminiLogging, glog, GeminiLocale, L
 local CommodityStats = {}
 
 local secondsInDay = 86400
@@ -93,7 +93,7 @@ function CommodityStats:new(o)
 end
 
 function CommodityStats:Init()
-    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2"})
+    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2", "Gemini:Locale-1.0"})
     Apollo.RegisterEventHandler("MailBoxActivate", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("ToggleMailWindow", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResults", self)
@@ -104,15 +104,19 @@ end
 
 function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
-    local GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+    GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
         level = GeminiLogging.WARN,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
 
+    GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
+    L = GeminiLocale:GetLocale("CommodityStats", false)
+
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
+    GeminiLocale:TranslateWindow(L, self.wndMain)
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
@@ -134,6 +138,7 @@ function CommodityStats:InitializeHooks()
         fnOldInitialize(tMarketPlaceCommodity)
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
         self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", tMarketPlaceCommodity.wndMain, self)
+        GeminiLocale:TranslateWindow(L, ScanButton)
         -- restore previous window position (which it really should do out of the box imo)
         if self.commPosition ~= nil then
             tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
@@ -294,7 +299,7 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
     if self.isScanning then
         self.queueSize = self.queueSize - 1
         if self.queueSize == 0 then
-            self.ScanButton:SetText("Finished!")
+            self.ScanButton:SetText(L["Finished!"])
             self.ScanButton:Enable(true)
             self.isScanning = false
         end
@@ -383,6 +388,7 @@ function CommodityStats:LoadStatisticsForm()
         self.wndStatistics:Destroy()
     end
     self.wndStatistics = Apollo.LoadForm(self.Xml, "StatisticsForm", self.wndMain:FindChild("MainForm"), self)
+    GeminiLocale:TranslateWindow(L, self.wndStatistics)
     self:DrawColorNotes()
     self:SetOrderTypeSelection()
     self.plot = PixiePlot:New(self.wndStatistics:FindChild("Plot"))
@@ -456,6 +462,7 @@ function CommodityStats:LoadStatisticsForm()
     self.plot:SetOption("fWndOverlaySize", 15)
     self.plot:SetOption("wndOverlayLoadCallback", function(tData, wnd)
         local wndTooltip = wnd:LoadTooltipForm("CommodityStats.xml", "TooltipForm", self)
+        GeminiLocale:TranslateWindow(L, wndTooltip)
         wndTooltip:FindChild("txtTime"):SetText(os.date(self.settings.dateFormatString, tData.x))
         wndTooltip:FindChild("monPrice"):SetAmount(tData.y)
         wnd:SetTooltipForm(wndTooltip)
@@ -627,6 +634,7 @@ function CommodityStats:LoadTransactionsForm()
         self.wndTransactions:Destroy()
     end
     self.wndTransactions = Apollo.LoadForm(self.Xml, "TransactionsForm", self.wndMain:FindChild("MainForm"), self)
+    GeminiLocale:TranslateWindow(L, self.wndTransactions)
     self:DisplayTransactions(self.currentItemID)
 end
 
@@ -635,6 +643,7 @@ function CommodityStats:LoadConfigForm()
         self.wndConfig:Destroy()
     end
     self.wndConfig = Apollo.LoadForm(self.Xml, "ConfigForm", self.wndMain:FindChild("MainForm"), self)
+    GeminiLocale:TranslateWindow(L, self.wndConfig)
 
     -- history settings
     self.wndConfig:FindChild("txtStatisticsAge"):SetText(tostring(self.settings.daysToKeep))
@@ -777,6 +786,7 @@ function GetTime()
 end
 
 function CommodityStats:OnMailboxOpen()
+    -- TODO: How the hell do we localise mailbox parsing?
     local mails = MailSystemLib.GetInbox()
     for i, mail in pairs(mails) do
         local info = mail:GetMessageInfo()
@@ -842,7 +852,7 @@ function CommodityStats:DisplayTransactions(itemID)
     if totalprofit < 0 then
         totalprofit = totalprofit * -1
         profitColor = "red" 
-        self.wndTransactions:FindChild("txtTotalProfit"):SetText("Total loss:")
+        self.wndTransactions:FindChild("txtTotalProfit"):SetText(L["Total loss:"])
     end
     self.wndTransactions:FindChild("monProfit"):SetTextColor(profitColor)
     self.wndTransactions:FindChild("monProfit"):SetAmount(totalprofit)
@@ -854,10 +864,10 @@ end
 
 function CommodityStats:AddTransactionItem(wndTarget, itemID, transaction)
     local result = ""
-    if transaction.result == CommodityStats.Result.BUYSUCCESS then result = "Buy success" end
-    if transaction.result == CommodityStats.Result.SELLSUCCESS then result = "Sell success" end
-    if transaction.result == CommodityStats.Result.BUYEXPIRED then result = "Buy expired" end
-    if transaction.result == CommodityStats.Result.SELLEXPIRED then result = "Sell expired" end
+    if transaction.result == CommodityStats.Result.BUYSUCCESS then result = L["Buy success"] end
+    if transaction.result == CommodityStats.Result.SELLSUCCESS then result = L["Sell success"] end
+    if transaction.result == CommodityStats.Result.BUYEXPIRED then result = L["Buy expired"] end
+    if transaction.result == CommodityStats.Result.SELLEXPIRED then result = L["Sell expired"] end
     local wndTransaction = Apollo.LoadForm(self.Xml, "TransactionItem", wndTarget, self)
     wndTransaction:FindChild("txtDate"):SetText(os.date(self.settings.dateFormatString, transaction.timestamp))
     wndTransaction:FindChild("txtQuantity"):SetText(tostring(transaction.quantity))
@@ -913,7 +923,7 @@ function singularize(s)
     -- We need the singular form in order to actually find the item ID.
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
-                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "stoutroot",
+                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
                     "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
     s = s:lower()
     for i, word in pairs(words) do
@@ -1086,9 +1096,9 @@ function CommodityStats:SetSelectedBaseSellPrice()
     local buttonText = "undefined"
     if self.settings.baseSellPrice == nil then self.settings.baseSellPrice = CommodityStats.Pricegroup.TOP1 end
     
-    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP1 then buttonText = "top 1 sell price" end
-    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP10 then buttonText = "top 10 sell price" end
-    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP50 then buttonText = "top 50 sell price" end
+    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP1 then buttonText = L["top 1 sell price"] end
+    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP10 then buttonText = L["top 10 sell price"] end
+    if self.settings.baseSellPrice == CommodityStats.Pricegroup.TOP50 then buttonText = L["top 50 sell price"] end
 
     self.wndConfig:FindChild("txtBaseSellPrice"):SetText(buttonText)
 end
@@ -1112,9 +1122,9 @@ function CommodityStats:SetSelectedBaseBuyPrice()
     local buttonText = "undefined"
     if self.settings.baseBuyPrice == nil then self.settings.baseBuyPrice = CommodityStats.Pricegroup.TOP1 end
     
-    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP1 then buttonText = "top 1 buy price" end
-    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP10 then buttonText = "top 10 buy price" end
-    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP50 then buttonText = "top 50 buy price" end
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP1 then buttonText = L["top 1 buy price"] end
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP10 then buttonText = L["top 10 buy price"] end
+    if self.settings.baseBuyPrice == CommodityStats.Pricegroup.TOP50 then buttonText = L["top 50 buy price"] end
 
     self.wndConfig:FindChild("txtBaseBuyPrice"):SetText(buttonText)
 end
@@ -1165,7 +1175,7 @@ end
 function CommodityStats:OnSetCustomDateTimeFormat( wndHandler, wndControl, eMouseButton )
     local formatstring = self.wndConfig:FindChild("txtCustomDateTime"):GetText()
     self.settings.dateFormatString = formatstring
-    self:ShowMessage({"Custom format successfully saved"})
+    self:ShowMessage({L["Custom format successfully saved"]})
 end
 
 function CommodityStats:OnBaseSellpriceDropDown( wndHandler, wndControl, eMouseButton )
@@ -1210,17 +1220,17 @@ function CommodityStats:btnSaveSellUndercutPercentage( wndHandler, wndControl, e
     if input ~= nil then
         if input >= 0 and input <= 100 then
             self.settings.sellUndercutPercentage = input
-            self:ShowMessage({"Value successfully saved"})
+            self:ShowMessage({L["Value successfully saved"]})
             return
         end
     end
-    self:ShowMessage( { "Input not valid, percentage not saved", "Please enter a numeric value between 0 and 100" })
+    self:ShowMessage( { L["Input not valid, percentage not saved"], L["Please enter a numeric value between 0 and 100"] })
 end
 
 function CommodityStats:btnSaveSellUndercutFixed( wndHandler, wndControl, eMouseButton )
     local input = self.wndConfig:FindChild("monSellUndercutFixed"):GetAmount()
     self.settings.sellUndercutFixed = input
-    self:ShowMessage({"Value successfully saved"})
+    self:ShowMessage({L["Value successfully saved"]})
 end
 
 function CommodityStats:OnBaseBuypriceDropDown( wndHandler, wndControl, eMouseButton )
@@ -1265,17 +1275,17 @@ function CommodityStats:btnSaveBuyIncreasePercentage( wndHandler, wndControl, eM
     if input ~= nil then
         if input >= 0 and input <= 100 then
             self.settings.buyIncreasePercentage = input
-            self:ShowMessage({"Value successfully saved"})
+            self:ShowMessage({L["Value successfully saved"]})
             return
         end
     end
-    self:ShowMessage( { "Input not valid, percentage not saved", "Please enter a numeric value between 0 and 100" })
+    self:ShowMessage( { L["Input not valid, percentage not saved"], L["Please enter a numeric value between 0 and 100"] })
 end
 
 function CommodityStats:btnSaveBuyIncreaseFixed( wndHandler, wndControl, eMouseButton )
     local input = self.wndConfig:FindChild("monBuyIncreaseFixed"):GetAmount()
     self.settings.buyIncreaseFixed = input
-    self:ShowMessage({"Value successfully saved"})
+    self:ShowMessage({L["Value successfully saved"]})
 end
 
 function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButton )
