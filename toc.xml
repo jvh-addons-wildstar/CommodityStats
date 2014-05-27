@@ -6,6 +6,8 @@
     <Script Name="libs\PixiePlot.lua" />
     <Script Name="libs\inspect.lua" />
     <Script Name="locale\enUS.lua"/>
+    <Script Name="locale\deDE.lua"/>
+    <Script Name="locale\frFR.lua"/>
     <Script Name="CommodityStats.lua"/>
     <Form Name="CommodityStats.xml"/>
 </Addon>

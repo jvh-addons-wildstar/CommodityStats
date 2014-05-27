@@ -968,7 +968,7 @@ end
 function CommodityStats:OnSettingsSave(wndHandler, wndControl, eMouseButton)
     self.settings.daysToKeep = tonumber(self.wndConfig:FindChild("txtStatisticsAge"):GetText())
     self.settings.daysUntilAverage = tonumber(self.wndConfig:FindChild("txtStatisticsAverage"):GetText())
-    wndControl:SetText("Saved!")
+    wndControl:SetText(L["Saved!"])
 end
 
 function CommodityStats:OnCancel()
