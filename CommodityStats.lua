@@ -788,26 +788,28 @@ function GetTime()
 end
 
 function CommodityStats:OnMailboxOpen()
-    -- TODO: How the hell do we localise mailbox parsing?
-    local mails = MailSystemLib.GetInbox()
-    for i, mail in pairs(mails) do
-        local info = mail:GetMessageInfo()
-        local itemID, transaction
-        if info.eSenderType == MailSystemLib.EmailType_CommodityAuction and info.bIsRead == false then
-            if info.strBody:lower():find("seller has been found") then
-                itemID, transaction = processTransaction(info, CommodityStats.Result.BUYSUCCESS)
-            elseif info.strBody:lower():find("buyer has been found") then
-                itemID, transaction = processTransaction(info, CommodityStats.Result.SELLSUCCESS)
-            elseif info.strBody:lower():find("buy order") then
-                itemID, transaction = processTransaction(info, CommodityStats.Result.BUYEXPIRED)
-            elseif info.strBody:lower():find("sell order") then
-                itemID, transaction = processTransaction(info, CommodityStats.Result.SELLEXPIRED)
+    -- Disabling it for non-US locales for now
+    if L["Locale"] == "enUS" then
+        local mails = MailSystemLib.GetInbox()
+        for i, mail in pairs(mails) do
+            local info = mail:GetMessageInfo()
+            local itemID, transaction
+            if info.eSenderType == MailSystemLib.EmailType_CommodityAuction and info.bIsRead == false then
+                if info.strBody:lower():find("seller has been found") then
+                    itemID, transaction = processTransaction(info, CommodityStats.Result.BUYSUCCESS)
+                elseif info.strBody:lower():find("buyer has been found") then
+                    itemID, transaction = processTransaction(info, CommodityStats.Result.SELLSUCCESS)
+                elseif info.strBody:lower():find("buy order") then
+                    itemID, transaction = processTransaction(info, CommodityStats.Result.BUYEXPIRED)
+                elseif info.strBody:lower():find("sell order") then
+                    itemID, transaction = processTransaction(info, CommodityStats.Result.SELLEXPIRED)
+                end
+                if transaction ~= nil and itemID ~= nil then
+                    if self.transactions[itemID] == nil then self.transactions[itemID] = {} end
+                    table.insert(self.transactions[itemID], transaction)
+                end
+                mail:MarkAsRead()
             end
-            if transaction ~= nil and itemID ~= nil then
-                if self.transactions[itemID] == nil then self.transactions[itemID] = {} end
-                table.insert(self.transactions[itemID], transaction)
-            end
-            mail:MarkAsRead()
         end
     end
 end

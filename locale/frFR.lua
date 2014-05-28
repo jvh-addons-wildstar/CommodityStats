@@ -2,6 +2,7 @@
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "frFR")
 if not L then return end
 -- Translated from google. Translators wanted!
+L["Locale"] = "frFR"
 L["Statistics"] = "Statistiques"
 L["Transactions"] = "Transactions"
 L["General Config"] = "Config générale"

@@ -1,7 +1,7 @@
 --Localization.enUS.lua
 local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "enUS", true)
 if not L then return end
-
+L["Locale"] = "enUS"
 L["Statistics"] = true
 L["Transactions"] = true
 L["General Config"] = true
@@ -76,3 +76,4 @@ L["Saved!"] = true
 L["Input not valid, percentage not saved"] = true
 L["Please enter a numeric value between 0 and 100"] = true
 L["Finished!"] = true
+L["Show price/transaction history"] = true
