@@ -1,5 +1,5 @@
 --Localization.deDE.lua
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "deDE", true)
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "deDE")
 if not L then return end
 -- Translated from google. Translators wanted!
 L["Statistics"] = "Statistiken"
@@ -76,3 +76,4 @@ L["Saved!"] = "Gespeichert"
 L["Input not valid, percentage not saved"] = "Ungültige Eingabe, Anteil nicht gespeichert"
 L["Please enter a numeric value between 0 and 100"] = "Bitte geben Sie einen numerischen Wert zwischen 0 und 100"
 L["Finished!"] = "Fertige"
+L["Show price/transaction history"] = "Preis/Transaktionshistorie"

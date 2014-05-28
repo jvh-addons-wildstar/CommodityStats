@@ -1,5 +1,5 @@
 --Localization.frFR.lua
-local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "frFR", true)
+local L = Apollo.GetPackage("Gemini:Locale-1.0").tPackage:NewLocale("CommodityStats", "frFR")
 if not L then return end
 -- Translated from google. Translators wanted!
 L["Statistics"] = "Statistiques"
@@ -76,3 +76,4 @@ L["Saved!"] = "Enregistré!"
 L["Input not valid, percentage not saved"] = "Entrée non valide, le pourcentage pas enregistré"
 L["Please enter a numeric value between 0 and 100"] = "S'il vous plaît entrer une valeur numérique entre 0 et 100"
 L["Finished!"] = "Fini!"
+L["Show price/transaction history"] = "Afficher l'historique des prix/transaction"

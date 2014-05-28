@@ -130,6 +130,7 @@ function CommodityStats:InitializeHooks()
         fnOldCREDDinitialize(tMarketPlaceCREDD)
         if self.CREDDStatButton ~= nil then self.CREDDStatButton:Destroy() end
         self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", tMarketPlaceCREDD.wndMain:FindChild("ActLater"), self)
+        self.CREDDStatButton:SetTooltip(L["Show price/transaction history"])
     end
 
     local fnOldInitialize = self.MarketplaceCommodity.Initialize
@@ -138,7 +139,7 @@ function CommodityStats:InitializeHooks()
         fnOldInitialize(tMarketPlaceCommodity)
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
         self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", tMarketPlaceCommodity.wndMain, self)
-        GeminiLocale:TranslateWindow(L, ScanButton)
+        self.ScanButton:SetText(L["Scan all data"])
         -- restore previous window position (which it really should do out of the box imo)
         if self.commPosition ~= nil then
             tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
@@ -153,7 +154,8 @@ function CommodityStats:InitializeHooks()
         local children = tMarketPlaceCommodity.wndMain:FindChild("MainScrollContainer"):GetChildren()
         for i, child in ipairs(children) do
             if child:GetText() == "" then
-                Apollo.LoadForm(self.Xml, "StatButton", child, self)
+                local stat = Apollo.LoadForm(self.Xml, "StatButton", child, self)
+                stat:SetTooltip(L["Show price/transaction history"])
             end
         end
     end
@@ -976,7 +978,7 @@ function CommodityStats:OnCancel()
 end
 
 function CommodityStats:OnScanData( wndHandler, wndControl, eMouseButton )
-    self.ScanButton:SetText("Scanning...")
+    self.ScanButton:SetText(L["Scanning..."])
     self.ScanButton:Enable(false)
     local queue = {}
     for idx, tTopCategory in ipairs(MarketplaceLib.GetCommodityFamilies()) do
