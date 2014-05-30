@@ -48,10 +48,6 @@ L["How long do we keep the price history? (0 = forever)"] = "Combien de temps co
 L["How long until we average hourly to daily statistics? (0 = never)"] = "Combien de temps avant d'aplanir la moyenne horaire en moyenne quotidienne ? (0 = jamais)"
 L["days"] = "jours" -- literal translation
 L["These changes won't be applied until you perform a /reloadui or restart the game."] = "Ces modifications ne seront pas prises en compte jusqu'à ce que vous effectuiez un /reloadui ou redémarriez le jeu."
-L["These changes won't be applied until you perform a /reloadui or restart the game."] = "Ces modifications ne seront pas prises en compte jusqu'à ce que vous effectuiez un /reloadui ou redémarriez le jeu."
-L["These changes won't be applied until you perform a /reloadui or restart the game."] = "Ces modifications ne seront pas prises en compte jusqu'à ce que vous effectuiez un /reloadui ou redémarriez le jeu."
-L["These changes won't be applied until you perform a /reloadui or restart the game."] = "Ces modifications ne seront pas prises en compte jusqu'à ce que vous effectuiez un /reloadui ou redémarriez le jeu."
-L["These changes won't be applied until you perform a /reloadui or restart the game."] = "Ces modifications ne seront pas prises en compte jusqu'à ce que vous effectuiez un /reloadui ou redémarriez le jeu."
 L["Save settings"] = "Sauver les paramètres" -- button
 L["Date Format:"] = "Format de date"
 L["day/month"] = "jour/mois"
