@@ -77,3 +77,9 @@ L["Input not valid, percentage not saved"] = true
 L["Please enter a numeric value between 0 and 100"] = true
 L["Finished!"] = true
 L["Show price/transaction history"] = true
+
+-- plural -> singular forms for transaction tracking
+L["singular"] = {
+	leaves = "leaf",
+	serpentlilies = "serpentlily"
+}

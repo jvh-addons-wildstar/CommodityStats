@@ -796,13 +796,13 @@ function CommodityStats:OnMailboxOpen()
             local itemID, transaction
             if info.eSenderType == MailSystemLib.EmailType_CommodityAuction and info.bIsRead == false then
                 if info.strBody:lower():find("seller has been found") then
-                    itemID, transaction = processTransaction(info, CommodityStats.Result.BUYSUCCESS)
+                    itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.BUYSUCCESS)
                 elseif info.strBody:lower():find("buyer has been found") then
-                    itemID, transaction = processTransaction(info, CommodityStats.Result.SELLSUCCESS)
+                    itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.SELLSUCCESS)
                 elseif info.strBody:lower():find("buy order") then
-                    itemID, transaction = processTransaction(info, CommodityStats.Result.BUYEXPIRED)
+                    itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.BUYEXPIRED)
                 elseif info.strBody:lower():find("sell order") then
-                    itemID, transaction = processTransaction(info, CommodityStats.Result.SELLEXPIRED)
+                    itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.SELLEXPIRED)
                 end
                 if transaction ~= nil and itemID ~= nil then
                     if self.transactions[itemID] == nil then self.transactions[itemID] = {} end
@@ -880,7 +880,7 @@ function CommodityStats:AddTransactionItem(wndTarget, itemID, transaction)
     return wndTransaction
 end
 
-function processTransaction(info, transactionresult)
+function CommodityStats:ProcessTransaction(info, transactionresult)
     glog:info("Processing mail with subject '" .. info.strSubject .."'. Transactionresult: " .. tostring(transactionresult) .. ".")
     local transaction = { result = transactionresult }
     local quantity, name, price, unit
@@ -896,7 +896,8 @@ function processTransaction(info, transactionresult)
     transaction.quantity = tonumber(trim(quantity))
     transaction.price = tonumber(trim(price))
     transaction.timestamp = getMailTime(info)
-    local item = getItemByName(singularize(trim(name))) 
+    local item = getItemByName(self:Singularize(trim(name))) 
+    if item == nil then item = getItemByName(self:SingularizeAlt(trim(name))) end
     if item == nil then
         glog:warn("Couldn't find item ID for " .. name .. ". Transaction not saved.")
         return nil, nil
@@ -922,16 +923,25 @@ function getMailTime(mailinfo)
     return os.time() - elapsedSeconds
 end
 
-function singularize(s)
+function CommodityStats:Singularize(s)
     -- Auction mails pluralize certain item names if multiple items were bought/sold.
     -- We need the singular form in order to actually find the item ID.
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
-                    "transformer", "acceleron", "ingot", "bladeleave", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
+                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
+    end
+    return s
+end
+
+function CommodityStats:SingularizeAlt(s)
+    -- experimental
+    s = s:lower()
+    for plur, sing in pairs(L["singular"]) do
+        s = s:gsub(plur, sing)
     end
     return s
 end
