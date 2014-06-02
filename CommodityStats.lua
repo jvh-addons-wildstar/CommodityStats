@@ -201,10 +201,11 @@ function CommodityStats:InitializeHooks()
         Apollo.LoadForm(self.Xml, "ListSubmitButtonOverlay", listSubmitBtn, self)
     end
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
-    self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
-        local tParameters= { iWindowType = GameLib.CodeEnumStoryPanel.Center, tLines = { strMessage }, nDisplayLength = nDuration }
-        MessageManagerLib.DisplayStoryPanel(tParameters)
-    end
+    -- MessageManagerLib currently doesn't seem to work, disable for now.
+    -- self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
+    --     local tParameters= { iWindowType = GameLib.CodeEnumStoryPanel.Center, tLines = { strMessage }, nDisplayLength = nDuration }
+    --     MessageManagerLib.DisplayStoryPanel(tParameters)
+    -- end
 
     -- Fix the error that occurs when you empty the quantity box
     local fnOldOnListInputNumberHelper = self.MarketplaceCommodity.OnListInputNumberHelper
