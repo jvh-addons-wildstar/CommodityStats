@@ -98,6 +98,7 @@ function CommodityStats:Init()
     Apollo.RegisterEventHandler("ToggleMailWindow", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResults", self)
     Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
+    Apollo.RegisterEventHandler("ItemRemoved", "OnItemRemoved", self)
     Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
     Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
 end
@@ -781,6 +782,21 @@ function GetTime()
     timeargs.min = 0
     timeargs.sec = 0
     return os.time(timeargs)
+end
+
+function CommodityStats:OnItemRemoved(itemSold, nCount, eReason) -- called when an item is sold to a vendor
+    Print(tostring(eReason))
+    if itemSold:IsCommodity() and eReason == Item.CodeEnumItemUpdateReason.Vendor then
+        local transaction = {}
+        transaction.quantity = nCount
+        transaction.price = itemSold:GetSellPrice():GetAmount()
+        transaction.timestamp = os.time()
+        transaction.result = CommodityStats.Result.SELLSUCCESS
+
+        local itemId = itemSold:GetItemId()
+        if self.transactions[itemId] == nil then self.transactions[itemId] = {} end
+        table.insert(self.transactions[itemId], transaction)
+    end
 end
 
 function CommodityStats:OnMailboxOpen()
