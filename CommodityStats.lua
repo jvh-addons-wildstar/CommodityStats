@@ -299,6 +299,14 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
             self.statistics[nItemId][timestamp] = stat
         end
     end
+
+    if stat.sellPrices.top1 > 0 then
+        local vendorprofit = self:GetVendorProfit(stat.sellPrices.top1, nItemId)
+        if vendorprofit > 0 then
+            Print("Potential profit for " .. Item.GetDataFromId(nItemId):GetName())
+        end
+    end
+
     if self.isScanning then
         self.queueSize = self.queueSize - 1
         if self.queueSize == 0 then
@@ -949,6 +957,15 @@ end
 
 function trim(s)
     return s:find'^%s*$' and '' or s:match'^%s*(.*%S)'
+end
+
+function CommodityStats:GetVendorProfit(sellprice, nItemId)
+    local tax = MarketplaceLib.kCommodityAuctionRake
+    local minimumTax = MarketplaceLib.knCommodityBuyOrderTaxMinimum
+    local item = Item.GetDataFromId(nItemId)
+    local vendorPrice = item:GetSellPrice():GetAmount()
+
+    return vendorPrice - sellprice - minimumTax
 end
 
 ---------------------------------------------------------------------------------------------------
