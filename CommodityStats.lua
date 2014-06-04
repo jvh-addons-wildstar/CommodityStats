@@ -106,7 +106,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.WARN,
+        level = GeminiLogging.INFO,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -229,19 +229,6 @@ function CommodityStats:OnListSubmitBtn( wndHandler, wndControl, eMouseButton, n
     end
 end
 
-function CommodityStats:SaveLastUsedParams(tMarketPlaceCommodity, wndHandler)
-    local containername = self:GetSelectedCategory(tMarketPlaceCommodity)
-    if containername ~= nil then
-        local tCurrItem = wndHandler:GetData()[1]
-        local wndParent = wndHandler:GetData()[2]
-        self[containername] = {}
-        self[containername].lastItemID = tCurrItem:GetItemId()
-        self[containername].lastPricePerUnit = wndParent:FindChild("ListInputPrice"):GetCurrency()
-        self[containername].lastQuantity = wndParent:FindChild("ListInputNumber"):GetText()
-        self[containername].lastScrollPos = tMarketPlaceCommodity.wndMain:FindChild("MainScrollContainer"):GetVScrollPos()
-    end
-end
-
 function CommodityStats:GetSelectedCategory(tMarketPlaceCommodity)
     if tMarketPlaceCommodity.wndMain:FindChild("HeaderSellOrderBtn"):IsChecked() then return CommodityStats.Category.SELLORDER end
     if tMarketPlaceCommodity.wndMain:FindChild("HeaderBuyOrderBtn"):IsChecked() then return CommodityStats.Category.BUYORDER end
@@ -303,7 +290,7 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
     if stat.sellPrices.top1 > 0 then
         local vendorprofit = self:GetVendorProfit(stat.sellPrices.top1, nItemId)
         if vendorprofit > 0 then
-            Print("Potential profit for " .. Item.GetDataFromId(nItemId):GetName())
+            glog:info("Potential profit for " .. Item.GetDataFromId(nItemId):GetName())
         end
     end
 
@@ -892,18 +879,28 @@ end
 function CommodityStats:ProcessTransaction(info, transactionresult)
     glog:info("Processing mail with subject '" .. info.strSubject .."'. Transactionresult: " .. tostring(transactionresult) .. ".")
     local transaction = { result = transactionresult }
-    local quantity, name, price, unit
+    local quantity, name, price
     if transactionresult == CommodityStats.Result.BUYSUCCESS or transactionresult == CommodityStats.Result.SELLSUCCESS then
-        quantity, name, price, unit = string.match(info.strBody, '(%d+)[^%s](.-)%.?\n?\r?\n.-(%d+)(.-)\r?\n')
+        quantity, name = string.match(info.strBody, '(%d+)[^%s](.-)%.?\n')
     else
-        quantity, name, price = string.match(info.strBody, 'for (%d+)[^%s](.-)at%s(%d+)')
+        quantity, name = string.match(info.strBody, 'for (%d+)[^%s](.-)at')
     end
-    if quantity == nil or name == nil or price == nil then
+    if quantity == nil or name == nil then
         glog:warn("Couldn't parse mail with subject '" .. info.strSubject .. "'.")
         return nil, nil
     end
+
+    local prefix = "%sat"
+    if transactionresult == CommodityStats.Result.SELLSUCCESS then prefix = "Total Profit:" end
+    if transactionresult == CommodityStats.Result.BUYSUCCESS then prefix = "Total Cost:" end
+    local platinum = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sPlatinum') or "0")
+    local gold = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sGold') or "0")
+    local silver = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sSilver') or "0")
+    local copper = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sCopper') or "0")
+    price = (platinum * 1000000) + (gold * 10000) + (silver * 100) + copper
+
     transaction.quantity = tonumber(trim(quantity))
-    transaction.price = tonumber(trim(price))
+    transaction.price = price
     transaction.timestamp = getMailTime(info)
     local item = getItemByName(self:Singularize(trim(name))) 
     if item == nil then item = getItemByName(self:SingularizeAlt(trim(name))) end
@@ -938,7 +935,7 @@ function CommodityStats:Singularize(s)
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
-                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample"}
+                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
