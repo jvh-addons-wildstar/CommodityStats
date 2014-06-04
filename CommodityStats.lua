@@ -106,7 +106,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.INFO,
+        level = GeminiLogging.WARN,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
