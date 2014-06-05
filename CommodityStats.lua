@@ -976,10 +976,9 @@ function CommodityStats:GetVendorProfit(sellprice, nItemId)
     local minimumTax = MarketplaceLib.knCommodityBuyOrderTaxMinimum
     local item = Item.GetDataFromId(nItemId)
     if item ~= nil then
-        local vendorPrice = item:GetSellPrice():GetAmount()
-        local sellPrice = item:GetSellPrice()
-        if sellPrice ~= nil then
-            return vendorPrice - sellprice - minimumTax
+        local vendorPrice = item:GetSellPrice()
+        if vendorPrice ~= nil then
+            return vendorPrice:GetAmount() - sellprice - minimumTax
         else
             return 0
         end
