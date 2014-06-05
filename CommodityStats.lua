@@ -208,10 +208,41 @@ function CommodityStats:InitializeHooks()
     --     MessageManagerLib.DisplayStoryPanel(tParameters)
     -- end
 
-    -- Fix the error that occurs when you empty the quantity box
-    local fnOldOnListInputNumberHelper = self.MarketplaceCommodity.OnListInputNumberHelper
-    self.MarketplaceCommodity.OnListInputNumberHelper = function(tMarketPlaceCommodity, wndParent, nNewValue)
-        fnOldOnListInputNumberHelper(tMarketPlaceCommodity, wndParent, nNewValue or 0)
+    -- tooltip content
+    local tTooltips = Apollo.GetAddon("ToolTips")
+    if (tTooltips == nil) then return end
+    -- CreateCallNames is run right after a tooltip is instantiated.
+    local origCreateCallNames = tTooltips.CreateCallNames
+    tTooltips.CreateCallNames = function(luaCaller)
+        origCreateCallNames(luaCaller)
+        local origItemTooltip = Tooltip.GetItemTooltipForm
+        Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
+            wndControl:SetTooltipDoc(nil)
+            local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+            if (wndTooltip ~= nil) and item:IsCommodity() then
+                local itemID = item:GetItemId()
+                local latestValues = self:GetMostRecentValues(itemID)
+                if latestValues then
+                    local wndBottom = wndTooltip:FindChild("ItemTooltip_SalvageAndMoney")
+                    if wndBottom ~= nil then
+                        local offset = 30
+                        local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
+                        extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1)
+                        extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10)
+                        extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50)
+                        extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1)
+                        extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10)
+                        extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50)
+                        GeminiLocale:TranslateWindow(L, extra)
+                        local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
+                        local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
+                        extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
+                        wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
+                    end
+                end
+            end
+            return wndTooltip, wndTooltipComp
+        end
     end
 end
 
@@ -272,6 +303,14 @@ function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
         end
     end
     return price
+end
+
+function CommodityStats:GetMostRecentValues(itemID)
+    local statistics = self.statistics[itemID]
+    if statistics == nil then return false end
+    local lastTime = table.maxn(statistics)
+    if statistics[lastTime].buyOrderCount == 0 and statistics[lastTime].sellOrderCount == 0 then return false end
+    return statistics[lastTime]
 end
 
 function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
