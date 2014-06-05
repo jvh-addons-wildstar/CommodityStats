@@ -785,7 +785,6 @@ function GetTime()
 end
 
 function CommodityStats:OnItemRemoved(itemSold, nCount, eReason) -- called when an item is sold to a vendor
-    Print(tostring(eReason))
     if itemSold:IsCommodity() and eReason == Item.CodeEnumItemUpdateReason.Vendor then
         local transaction = {}
         transaction.quantity = nCount
@@ -976,9 +975,17 @@ function CommodityStats:GetVendorProfit(sellprice, nItemId)
     local tax = MarketplaceLib.kCommodityAuctionRake
     local minimumTax = MarketplaceLib.knCommodityBuyOrderTaxMinimum
     local item = Item.GetDataFromId(nItemId)
-    local vendorPrice = item:GetSellPrice():GetAmount()
-
-    return vendorPrice - sellprice - minimumTax
+    if item ~= nil then
+        local vendorPrice = item:GetSellPrice():GetAmount()
+        local sellPrice = item:GetSellPrice()
+        if sellPrice ~= nil then
+            return vendorPrice - sellprice - minimumTax
+        else
+            return 0
+        end
+    else
+        return 0
+    end
 end
 
 ---------------------------------------------------------------------------------------------------
