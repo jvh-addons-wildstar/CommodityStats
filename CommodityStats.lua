@@ -223,22 +223,19 @@ function CommodityStats:InitializeHooks()
                 local itemID = item:GetItemId()
                 local latestValues = self:GetMostRecentValues(itemID)
                 if latestValues then
-                    local wndBottom = wndTooltip:FindChild("ItemTooltip_SalvageAndMoney")
-                    if wndBottom ~= nil then
-                        local offset = 30
-                        local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
-                        extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1)
-                        extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10)
-                        extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50)
-                        extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1)
-                        extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10)
-                        extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50)
-                        GeminiLocale:TranslateWindow(L, extra)
-                        local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
-                        local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
-                        extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
-                        wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
-                    end
+                    local offset = 20
+                    local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
+                    extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1)
+                    extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10)
+                    extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50)
+                    extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1)
+                    extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10)
+                    extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50)
+                    GeminiLocale:TranslateWindow(L, extra)
+                    local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
+                    local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
+                    extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
+                    wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
                 end
             end
             return wndTooltip, wndTooltipComp
@@ -886,11 +883,11 @@ function CommodityStats:DisplayTransactions(itemID)
             for i, transaction in ipairs(self.transactions[itemID]) do
                 if transaction.result == CommodityStats.Result.BUYSUCCESS then 
                     buyQuantity = buyQuantity + transaction.quantity
-                    buyTotal = buyTotal + (transaction.quantity * transaction.price)
+                    buyTotal = buyTotal + transaction.price
                 end
                 if transaction.result == CommodityStats.Result.SELLSUCCESS then
                     sellQuantity = sellQuantity + transaction.quantity
-                    sellTotal = sellTotal + (transaction.quantity * transaction.price)
+                    sellTotal = sellTotal + transaction.price
                 end
                 table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
             end
@@ -937,20 +934,20 @@ function CommodityStats:ProcessTransaction(info, transactionresult)
     if transactionresult == CommodityStats.Result.BUYSUCCESS or transactionresult == CommodityStats.Result.SELLSUCCESS then
         quantity, name = string.match(info.strBody, '(%d+)[^%s](.-)%.?\n')
     else
-        quantity, name = string.match(info.strBody, 'for (%d+)[^%s](.-)at')
+        quantity, name = string.match(info.strBody, 'for (%d+)[^%s](.-)%sat')
     end
     if quantity == nil or name == nil then
         glog:warn("Couldn't parse mail with subject '" .. info.strSubject .. "'.")
         return nil, nil
     end
 
+    local body = info.strBody:lower()
     local prefix = "%sat"
-    if transactionresult == CommodityStats.Result.SELLSUCCESS then prefix = "Total Profit:" end
-    if transactionresult == CommodityStats.Result.BUYSUCCESS then prefix = "Total Cost:" end
-    local platinum = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sPlatinum') or "0")
-    local gold = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sGold') or "0")
-    local silver = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sSilver') or "0")
-    local copper = tonumber(string.match(info.strBody, prefix .. '.-(%d+)%sCopper') or "0")
+    if transactionresult == CommodityStats.Result.BUYSUCCESS or transactionresult == CommodityStats.Result.SELLSUCCESS then prefix = "price per item:" end
+    local platinum = tonumber(string.match(body, prefix .. '.-(%d+)%splatinum') or "0")
+    local gold = tonumber(string.match(body, prefix .. '.-(%d+)%sgold') or "0")
+    local silver = tonumber(string.match(body, prefix .. '.-(%d+)%ssilver') or "0")
+    local copper = tonumber(string.match(body, prefix .. '.-(%d+)%scopper') or "0")
     price = (platinum * 1000000) + (gold * 10000) + (silver * 100) + copper
 
     transaction.quantity = tonumber(trim(quantity))
