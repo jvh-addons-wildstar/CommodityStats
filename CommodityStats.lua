@@ -272,7 +272,7 @@ function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
         local sellPriceGroup = self.settings.baseSellPrice or CommodityStats.Pricegroup.TOP10
         local strategy = self.settings.sellStrategy or CommodityStats.Strategy.MATCH
         if selectedCategory == CommodityStats.Category.BUYNOW then
-            sellPriceGroup = CommodityStats.Pricegroup.TOP1
+            sellPriceGroup = CommodityStats.Pricegroup.TOP50
             strategy = CommodityStats.Strategy.MATCH
         end
         price = tStats.arSellOrderPrices[sellPriceGroup].monPrice:GetAmount()
@@ -287,7 +287,7 @@ function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
         local buyPriceGroup = self.settings.baseBuyPrice or CommodityStats.Pricegroup.TOP10
         local strategy = self.settings.buyStrategy or CommodityStats.Strategy.MATCH
         if selectedCategory == CommodityStats.Category.SELLNOW then
-            buyPriceGroup = CommodityStats.Pricegroup.TOP1
+            buyPriceGroup = CommodityStats.Pricegroup.TOP50
             strategy = CommodityStats.Strategy.MATCH
         end
 
