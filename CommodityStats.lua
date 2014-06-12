@@ -306,6 +306,7 @@ function CommodityStats:GetMostRecentValues(itemID)
     local statistics = self.statistics[itemID]
     if statistics == nil then return false end
     local lastTime = table.maxn(statistics)
+    if lastTime < 1 then return false end
     if statistics[lastTime].buyOrderCount == 0 and statistics[lastTime].sellOrderCount == 0 then return false end
     return statistics[lastTime]
 end
