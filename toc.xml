@@ -8,6 +8,7 @@
     <Script Name="locale\enUS.lua"/>
     <Script Name="locale\deDE.lua"/>
     <Script Name="locale\frFR.lua"/>
+    <Script Name="PluginManager.lua"/>
     <Script Name="CommodityStats.lua"/>
     <Form Name="CommodityStats.xml"/>
 </Addon>

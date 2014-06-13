@@ -115,6 +115,8 @@ function CommodityStats:OnLoad()
     GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
     L = GeminiLocale:GetLocale("CommodityStats", false)
 
+    self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage:Init(self, glog)
+
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
     GeminiLocale:TranslateWindow(L, self.wndMain)
