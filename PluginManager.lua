@@ -1,6 +1,6 @@
 local PluginManager = {}
 
-function PluginManager.Init(cs, glog)
+function PluginManager.Init(cs)
 	local self = {
 		searchPlugins = {}
 	}
@@ -15,19 +15,25 @@ function PluginManager.Init(cs, glog)
 			searchCallback = searchCallback,
 			tHandler = tHandler
 		}
-		glog:info("PLUGINMANAGER: Added search plugin with title: " .. buttonText .. ".")
+		Event_FireGenericEvent("PluginManagerMessage", "Added search plugin with title: " .. buttonText .. ".")
 	end
 
 	function self:InitSearchWindow(selected)
-		if #searchPlugins == 0 then
-			glog:warn("PLUGINMANAGER: No search plugins found. Nothing to do here.")
+		if count(self.searchPlugins) == 0 then
+			Event_FireGenericEvent("PluginManagerMessage", "No search plugins found. Nothing to do here.")
 			return
 		end
-		self.wndSearch = Apollo.LoadForm(cs.Xml, "wndAdvancedSearch", nil, self)
+		self.wndSearch = Apollo.LoadForm(cs.Xml, "AdvancedSearch", nil, self)
 		self.wndResultList = self.wndSearch:FindChild("ResultList")
 		local dropdown = self.wndSearch:FindChild("cboSearches")
 		local selectedSearch = self.wndSearch:FindChild("txtSelectedSearch")
-		local selectedTitle = selected or self.searchPlugins[1]
+		local selectedTitle = selected
+		if not selectedTitle then
+			for key, value in pairs(self.searchPlugins) do
+				selectedTitle = key
+				break
+			end
+		end
 
 		for title, properties in pairs(self.searchPlugins) do
 			self:AddDropdownEntry(dropdown, title)
@@ -45,7 +51,7 @@ function PluginManager.Init(cs, glog)
 	end
 
 	function self:SetActiveSearch(title)
-		local searchPlugin = self.searchPlugins[selectedTitle]
+		local searchPlugin = self.searchPlugins[title]
 		if searchPlugin.searchCallback ~= nil then
 			searchPlugin.searchCallback()
 		end
@@ -53,7 +59,7 @@ function PluginManager.Init(cs, glog)
 		if searchPlugin.wndSearchOptions ~= nil then
 			-- can't move window to a different parent, so we re-create it
 			local windowName = searchPlugin.wndSearchOptions:GetName()
-			glog:info("PLUGINMANAGER: Search window with name '" .. windowName .. "' exists. Adding it as child.")
+			Event_FireGenericEvent("PluginManagerMessage", "Search window with name '" .. windowName .. "' exists. Adding it as child.")
 			local XmlDocument = Apollo.GetPackage("Drafto:Lib:XmlDocument-1.0").tPackage
 			local tDoc = XmlDocument.CreateFromTable(searchPlugin.wndSearchOptions)
 			tDoc:LoadForm(windowName, self.wndSearch:FindChild("SearchOptions"), searchPlugin.tHandler)
@@ -67,9 +73,18 @@ function PluginManager.Init(cs, glog)
 	end
 
 	function self:AddTextSearchResult(content, height)
-		glog:debug("PLUGINMANAGER: Text result received")
+		Event_FireGenericEvent("PluginManagerMessage", "Text result received")
 		local result = Apollo.LoadForm(cs.Xml, "TextSearchResult", self.wndResultList, self)
-		result:SetDoc(content)
+		result:SetText(content)
+		self.wndResultList:ArrangeChildrenVert()
+	end
+
+	function count(dictionary)
+		local count = 0
+		for key, val in pairs(dictionary) do
+			count = count + 1
+		end
+		return count
 	end
 
 	return self

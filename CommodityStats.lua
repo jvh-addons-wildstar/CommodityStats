@@ -99,6 +99,7 @@ function CommodityStats:Init()
     Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResults", self)
     Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
     Apollo.RegisterEventHandler("ItemRemoved", "OnItemRemoved", self)
+    Apollo.RegisterEventHandler("PluginManagerMessage", "OnPluginManagerMessage", self)
     Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
     Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
 end
@@ -107,7 +108,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.WARN,
+        level = GeminiLogging.INFO,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -115,11 +116,12 @@ function CommodityStats:OnLoad()
     GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
     L = GeminiLocale:GetLocale("CommodityStats", false)
 
-    self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage:Init(self, glog)
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
     GeminiLocale:TranslateWindow(L, self.wndMain)
+
+    self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage.Init(self)
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
@@ -137,12 +139,13 @@ function CommodityStats:InitializeHooks()
     end
 
     local fnOldInitialize = self.MarketplaceCommodity.Initialize
-    -- Add scanbutton to Commodity Exchange
+    -- Add extra buttons to Commodity Exchange
     self.MarketplaceCommodity.Initialize = function(tMarketPlaceCommodity)
         fnOldInitialize(tMarketPlaceCommodity)
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
         self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", tMarketPlaceCommodity.wndMain, self)
         self.ScanButton:SetText(L["Scan all data"])
+        local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", tMarketPlaceCommodity.wndMain, self)
         -- restore previous window position (which it really should do out of the box imo)
         if self.commPosition ~= nil then
             tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
@@ -186,6 +189,13 @@ function CommodityStats:InitializeHooks()
         end
         if price == 0 then
             price = self:GetPrice(nItemId, tStats, selectedCategory)
+        end
+
+        local priceSubtitle = wndMatch:FindChild("ListSubtitlePriceLeft") -- The 'current price' field. Show the best price here
+        if selectedCategory == CommodityStats.Category.BUYNOW then
+            priceSubtitle:SetAmount(tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP1].monPrice:GetAmount())
+        elseif selectedCategory == CommodityStats.Category.SELLNOW then
+            priceSubtitle:SetAmount(tStats.arBuyOrderPrices[CommodityStats.Pricegroup.TOP1].monPrice:GetAmount())
         end
 
         local listSubmitBtn = wndMatch:FindChild("ListSubmitBtn")
@@ -327,13 +337,6 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
         end
     end
 
-    if stat.sellPrices.top1 > 0 then
-        local vendorprofit = self:GetVendorProfit(stat.sellPrices.top1, nItemId)
-        if vendorprofit > 0 then
-            glog:info("Potential profit for " .. Item.GetDataFromId(nItemId):GetName())
-        end
-    end
-
     if self.isScanning then
         self.queueSize = self.queueSize - 1
         if self.queueSize == 0 then
@@ -419,6 +422,12 @@ function CommodityStats:DrawColorNotes()
     DrawLine(self.wndStatistics:FindChild("PixieSelltop1"), 3, clrSellTop1)
     DrawLine(self.wndStatistics:FindChild("PixieSelltop10"), 3, clrSellTop10)
     DrawLine(self.wndStatistics:FindChild("PixieSelltop50"), 3, clrSellTop50)
+end
+
+function CommodityStats:OnPluginManagerMessage(message)
+    if glog ~= nil then
+        glog:info("PLUGINMANAGER: " .. message)
+    end
 end
 
 function CommodityStats:LoadStatisticsForm()
@@ -947,10 +956,10 @@ function CommodityStats:ProcessTransaction(info, transactionresult)
     local body = info.strBody:lower()
     local prefix = "%sat"
     if transactionresult == CommodityStats.Result.BUYSUCCESS or transactionresult == CommodityStats.Result.SELLSUCCESS then prefix = "price per item:" end
-    local platinum = tonumber(string.match(body, prefix .. '.-(%d+)%splatinum') or "0")
-    local gold = tonumber(string.match(body, prefix .. '.-(%d+)%sgold') or "0")
-    local silver = tonumber(string.match(body, prefix .. '.-(%d+)%ssilver') or "0")
-    local copper = tonumber(string.match(body, prefix .. '.-(%d+)%scopper') or "0")
+    local platinum = tonumber(string.match(body, prefix .. '.-(%d+)%splatinum.-total') or "0")
+    local gold = tonumber(string.match(body, prefix .. '.-(%d+)%sgold.-total') or "0")
+    local silver = tonumber(string.match(body, prefix .. '.-(%d+)%ssilver.-total') or "0")
+    local copper = tonumber(string.match(body, prefix .. '.-(%d+)%scopper.-total') or "0")
     price = (platinum * 1000000) + (gold * 10000) + (silver * 100) + copper
 
     transaction.quantity = tonumber(trim(quantity))
@@ -1008,22 +1017,6 @@ end
 
 function trim(s)
     return s:find'^%s*$' and '' or s:match'^%s*(.*%S)'
-end
-
-function CommodityStats:GetVendorProfit(sellprice, nItemId)
-    local tax = MarketplaceLib.kCommodityAuctionRake
-    local minimumTax = MarketplaceLib.knCommodityBuyOrderTaxMinimum
-    local item = Item.GetDataFromId(nItemId)
-    if item ~= nil then
-        local vendorPrice = item:GetSellPrice()
-        if vendorPrice ~= nil then
-            return vendorPrice:GetAmount() - sellprice - minimumTax
-        else
-            return 0
-        end
-    else
-        return 0
-    end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1382,6 +1375,9 @@ function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButt
     self.settings.autoQuantity = wndControl:IsChecked()
 end
 
+function CommodityStats:OnAdvancedSearch( wndHandler, wndControl, eMouseButton )
+    self.plugins:InitSearchWindow()
+end
 
 local CommodityStatsInst = CommodityStats:new()
 CommodityStatsInst:Init()
