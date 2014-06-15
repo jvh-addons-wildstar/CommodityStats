@@ -100,12 +100,13 @@ function XmlDocument.NewForm()
 end
 
 function XmlDocument.CreateFromTable(tXml)
-	local tDoc = self.New()
-	local tRoot = CreateNodeFromTable(tXml)
+	local tDoc = XmlDocument.New()
+	local tRoot = XmlDocument.CreateNodeFromTable(tDoc, tXml)
 	for i,v in ipairs(tXml) do
 		AddChildFromTable(v, tRoot)
 	end
 	tDoc:SetRoot(tRoot)
+	return tDoc
 end
 
 local function AddChildFromTable(tXml, tParent)
@@ -116,7 +117,7 @@ local function AddChildFromTable(tXml, tParent)
 	end
 end
 
-local function CreateNodeFromTable(tXml)
+function XmlDocument.CreateNodeFromTable(tDoc, tXml)
 	local tNode = tDoc:NewNode(tXml.__XmlNode)
 	for k,v in pairs(tXml) do
 		tNode:Attribute(k, v)

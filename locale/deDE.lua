@@ -80,3 +80,4 @@ L["Input not valid, percentage not saved"] = "Ungültige Eingabe, Anteil nicht g
 L["Please enter a numeric value between 0 and 100"] = "Bitte geben Sie einen numerischen Wert zwischen 0 und 100 ein"
 L["Finished!"] = "Fertig!"
 L["Show price/transaction history"] = "Zeige Preis/Transaktionsverlauf"
+L["Search"] = "Suche"

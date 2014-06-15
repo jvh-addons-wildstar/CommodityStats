@@ -100,6 +100,7 @@ function CommodityStats:Init()
     Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
     Apollo.RegisterEventHandler("ItemRemoved", "OnItemRemoved", self)
     Apollo.RegisterEventHandler("PluginManagerMessage", "OnPluginManagerMessage", self)
+    Apollo.RegisterEventHandler("PluginManagerSearchSelected", "OnPluginSearchSelected", self)
     Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
     Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
 end
@@ -125,6 +126,10 @@ function CommodityStats:OnLoad()
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
+
+    self.messageTimer = ApolloTimer.Create(3, true, "OnClearMessageTimer", self)
+    self.messageTimer:Stop()
+
     self:InitializeHooks()
 end
 
@@ -145,7 +150,10 @@ function CommodityStats:InitializeHooks()
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
         self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", tMarketPlaceCommodity.wndMain, self)
         self.ScanButton:SetText(L["Scan all data"])
-        local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", tMarketPlaceCommodity.wndMain, self)
+        if self.plugins:GetPluginCount() > 0 then
+            local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", tMarketPlaceCommodity.wndMain, self)
+            searchButton:SetText(L["Search"])
+        end
         -- restore previous window position (which it really should do out of the box imo)
         if self.commPosition ~= nil then
             tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
@@ -215,10 +223,15 @@ function CommodityStats:InitializeHooks()
     end
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
     -- MessageManagerLib currently doesn't seem to work, disable for now.
-    -- self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
-    --     local tParameters= { iWindowType = GameLib.CodeEnumStoryPanel.Center, tLines = { strMessage }, nDisplayLength = nDuration }
-    --     MessageManagerLib.DisplayStoryPanel(tParameters)
-    -- end
+    self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
+        if self.messageWindow ~= nil then self.messageWindow:Destroy() end
+        self.messageWindow = Apollo.LoadForm(self.Xml, "MessageWindow", nil, self)
+        self.messageWindow:SetText(strMessage)
+        self.messageWindow:Show(true)
+        self.messageWindow:ToFront()
+        self.messageTimer:Stop()
+        self.messageTimer:Start()
+    end
 
     -- tooltip content
     local tTooltips = Apollo.GetAddon("ToolTips")
@@ -252,6 +265,13 @@ function CommodityStats:InitializeHooks()
             end
             return wndTooltip, wndTooltipComp
         end
+    end
+end
+
+function CommodityStats:OnClearMessageTimer()
+    if self.messageWindow ~= nil then
+        self.messageWindow:Show(false)
+        self.messageTimer:Stop()
     end
 end
 
@@ -332,9 +352,10 @@ function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
         end
         local timestamp = GetTime()
         stat.time = timestamp
-        if self.statistics[nItemId][timestamp] == nil then
-            self.statistics[nItemId][timestamp] = stat
-        end
+        -- if self.statistics[nItemId][timestamp] == nil then
+        --     self.statistics[nItemId][timestamp] = stat
+        -- end
+        self.statistics[nItemId][timestamp] = stat
     end
 
     if self.isScanning then
@@ -392,6 +413,14 @@ function CommodityStats:OnSave(eLevel)
     -- save window positions
     local mainPosLeft, mainPosTop = self.wndMain:GetPos()
     local commPosLeft, commPosTop = self.MarketplaceCommodity.wndMain:GetPos()
+    if self.plugins.wndSearch ~= nil then
+        searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
+        if searchPosLeft ~= nil then
+            save.searchPosition = { left = searchPosLeft, top = searchPosTop }
+        elseif self.searchPosition ~= nil then
+            save.searchPosition = self.searchPosition
+        end
+    end
     save.mainPosition = { left = mainPosLeft, top = mainPosTop }
     save.commPosition = { left = commPosLeft, top = commPosTop }
 
@@ -413,6 +442,7 @@ function CommodityStats:OnRestore(eLevel, tData)
         self.wndMain:Move(tData.mainPosition.left, tData.mainPosition.top, self.wndMain:GetWidth(), self.wndMain:GetHeight())
     end
     if tData.commPosition ~= nil then self.commPosition = tData.commPosition end
+    if tData.searchPosition ~= nil then self.searchPosition = tData.searchPosition end
 end
 
 function CommodityStats:DrawColorNotes()
@@ -428,6 +458,10 @@ function CommodityStats:OnPluginManagerMessage(message)
     if glog ~= nil then
         glog:info("PLUGINMANAGER: " .. message)
     end
+end
+
+function CommodityStats:OnPluginSearchSelected(title)
+    self.settings.latestSearch = title
 end
 
 function CommodityStats:LoadStatisticsForm()
@@ -1376,7 +1410,7 @@ function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButt
 end
 
 function CommodityStats:OnAdvancedSearch( wndHandler, wndControl, eMouseButton )
-    self.plugins:InitSearchWindow()
+    self.plugins:InitSearchWindow(self.searchPosition, self.settings.latestSearch)
 end
 
 local CommodityStatsInst = CommodityStats:new()
