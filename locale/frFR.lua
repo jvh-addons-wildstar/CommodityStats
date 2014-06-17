@@ -80,3 +80,4 @@ L["Input not valid, percentage not saved"] = "Paramètre non valide, pourcentage
 L["Please enter a numeric value between 0 and 100"] = "Veuillez entrer une valeur numérique entre 0 et 100" -- shown when input percentage < 0 or > 100
 L["Finished!"] = "Fini!" -- Shown on button when scanning is finished
 L["Show price/transaction history"] = "Afficher l'historique des prix/transactions" -- tooltip for added buttons on MarketplaceCommodity
+L["Search"] = "Chercher"

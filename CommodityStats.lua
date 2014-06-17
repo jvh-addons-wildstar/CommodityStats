@@ -93,14 +93,15 @@ function CommodityStats:new(o)
 end
 
 function CommodityStats:Init()
-    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2", "Gemini:Locale-1.0"})
+    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2", "Gemini:Locale-1.0", "Gemini:Hook-1.0"})
     Apollo.RegisterEventHandler("MailBoxActivate", "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("ToggleMailWindow", "OnMailboxOpen", self)
-    Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResults", self)
+    Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResultsNative", self)
     Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
     Apollo.RegisterEventHandler("ItemRemoved", "OnItemRemoved", self)
     Apollo.RegisterEventHandler("PluginManagerMessage", "OnPluginManagerMessage", self)
     Apollo.RegisterEventHandler("PluginManagerSearchSelected", "OnPluginSearchSelected", self)
+    Apollo.RegisterEventHandler("RequestStatistics", "OnRequestStatistics", self)
     Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
     Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
 end
@@ -109,7 +110,7 @@ function CommodityStats:OnLoad()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.INFO,
+        level = GeminiLogging.WARN,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -117,6 +118,7 @@ function CommodityStats:OnLoad()
     GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
     L = GeminiLocale:GetLocale("CommodityStats", false)
 
+    Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
@@ -134,50 +136,62 @@ function CommodityStats:OnLoad()
 end
 
 function CommodityStats:InitializeHooks()
-    local fnOldCREDDinitialize = self.MarketplaceCREDD.Initialize
     -- Add statistics button to CREDD Exchange
-    self.MarketplaceCREDD.Initialize = function(tMarketPlaceCREDD)
-        fnOldCREDDinitialize(tMarketPlaceCREDD)
+    self:PostHook(self.MarketplaceCREDD, "Initialize")
+
+    -- Add extra buttons to Commodity Exchange
+    self:PostHook(self.MarketplaceCommodity, "Initialize")
+
+    -- Add statistics button to every listed commodity item
+    self:PostHook(self.MarketplaceCommodity, "OnHeaderBtnToggle")
+
+    -- Fill in the best available price for buy/sell orders
+    self:PostHook(self.MarketplaceCommodity, "OnCommodityInfoResults")
+
+    -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
+    self:RawHook(self.MarketplaceCommodity, "OnPostCustomMessage")
+
+    -- tooltip content
+    self:PostHook(Apollo.GetAddon("ToolTips"), "CreateCallNames")
+end
+
+function CommodityStats:Initialize(luaCaller)
+    if luaCaller == self.MarketplaceCREDD then
         if self.CREDDStatButton ~= nil then self.CREDDStatButton:Destroy() end
-        self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", tMarketPlaceCREDD.wndMain:FindChild("ActLater"), self)
+        self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", luaCaller.wndMain:FindChild("ActLater"), self)
         self.CREDDStatButton:SetTooltip(L["Show price/transaction history"])
     end
 
-    local fnOldInitialize = self.MarketplaceCommodity.Initialize
-    -- Add extra buttons to Commodity Exchange
-    self.MarketplaceCommodity.Initialize = function(tMarketPlaceCommodity)
-        fnOldInitialize(tMarketPlaceCommodity)
+    if luaCaller == self.MarketplaceCommodity then
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
-        self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", tMarketPlaceCommodity.wndMain, self)
+        self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", luaCaller.wndMain, self)
         self.ScanButton:SetText(L["Scan all data"])
         if self.plugins:GetPluginCount() > 0 then
-            local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", tMarketPlaceCommodity.wndMain, self)
+            local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", luaCaller.wndMain, self)
             searchButton:SetText(L["Search"])
         end
         -- restore previous window position (which it really should do out of the box imo)
         if self.commPosition ~= nil then
-            tMarketPlaceCommodity.wndMain:Move(self.commPosition.left, self.commPosition.top, tMarketPlaceCommodity.wndMain:GetWidth(), tMarketPlaceCommodity.wndMain:GetHeight())
+            luaCaller.wndMain:Move(self.commPosition.left, self.commPosition.top, luaCaller.wndMain:GetWidth(), luaCaller.wndMain:GetHeight())
         end
         -- Get CREDD info separately since it's not part of the CX, but we want the history on it.
         CREDDExchangeLib.RequestExchangeInfo()
     end
-    -- Add statistics button to every listed commodity item
-    local fnOldHeaderBtnToggle = self.MarketplaceCommodity.OnHeaderBtnToggle
-    self.MarketplaceCommodity.OnHeaderBtnToggle = function(tMarketPlaceCommodity)
-        fnOldHeaderBtnToggle(tMarketPlaceCommodity)
-        local children = tMarketPlaceCommodity.wndMain:FindChild("MainScrollContainer"):GetChildren()
-        for i, child in ipairs(children) do
-            if child:GetText() == "" then
-                local stat = Apollo.LoadForm(self.Xml, "StatButton", child, self)
-                stat:SetTooltip(L["Show price/transaction history"])
-            end
+end
+
+function CommodityStats:OnHeaderBtnToggle(luaCaller)
+    local children = luaCaller.wndMain:FindChild("MainScrollContainer"):GetChildren()
+    for i, child in ipairs(children) do
+        if child:GetText() == "" then
+            local stat = Apollo.LoadForm(self.Xml, "StatButton", child, self)
+            stat:SetTooltip(L["Show price/transaction history"])
         end
     end
-    -- Fill in the best available price for buy/sell orders
-    local fnOldOnCommodityInfoResults = self.MarketplaceCommodity.OnCommodityInfoResults
-    self.MarketplaceCommodity.OnCommodityInfoResults = function(tMarketPlaceCommodity, nItemId, tStats, tOrders)
-        fnOldOnCommodityInfoResults(tMarketPlaceCommodity, nItemId, tStats, tOrders)
-        local scrollContainer = tMarketPlaceCommodity.wndMain:FindChild("MainScrollContainer")
+end
+
+function CommodityStats:OnCommodityInfoResults(luaCaller, nItemId, tStats, tOrders)
+    if luaCaller == self.MarketplaceCommodity and luaCaller.wndMain ~= nil then
+        local scrollContainer = luaCaller.wndMain:FindChild("MainScrollContainer")
         if not scrollContainer then return end
         local wndMatch = scrollContainer:FindChild(nItemId)
         if not wndMatch or not wndMatch:IsValid() then
@@ -186,7 +200,7 @@ function CommodityStats:InitializeHooks()
 
         local price = 0
         local hasPreviousQuantity
-        local selectedCategory = self:GetSelectedCategory(tMarketPlaceCommodity);
+        local selectedCategory = self:GetSelectedCategory(luaCaller);
         if self[selectedCategory] ~= nil then -- do we have previously saved prices/quantities?
             scrollContainer:SetVScrollPos(self[selectedCategory].lastScrollPos)
             if self[selectedCategory].lastItemID == nItemId then
@@ -215,57 +229,75 @@ function CommodityStats:InitializeHooks()
             local sellQuantity = wndMatch:FindChild("ListCount"):GetData() or 0
             if sellQuantity > maxOrder then sellQuantity = maxOrder end
             wndMatch:FindChild("ListInputNumber"):SetText(sellQuantity)
-            tMarketPlaceCommodity:OnListInputNumberHelper(wndMatch, sellQuantity)
+            luaCaller:OnListInputNumberHelper(wndMatch, sellQuantity)
         end
 
         -- Add an extra invisible window to the Submit button so that we can intercept the click event on an otherwise protected ActionConfirmButton
         Apollo.LoadForm(self.Xml, "ListSubmitButtonOverlay", listSubmitBtn, self)
     end
-    -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
-    -- MessageManagerLib currently doesn't seem to work, disable for now.
-    self.MarketplaceCommodity.OnPostCustomMessage = function(tMarketPlaceCommodity, strMessage, bResultOK, nDuration)
-        if self.messageWindow ~= nil then self.messageWindow:Destroy() end
-        self.messageWindow = Apollo.LoadForm(self.Xml, "MessageWindow", nil, self)
-        self.messageWindow:SetText(strMessage)
-        self.messageWindow:Show(true)
-        self.messageWindow:ToFront()
-        self.messageTimer:Stop()
-        self.messageTimer:Start()
+end
+
+function CommodityStats:OnCommodityInfoResultsNative(nItemId, tStats, tOrders)
+    glog:debug("Commodity info received for item ID " .. tostring(nItemId) .. ".")
+    local stat = self:CreateCommodityStat(tStats)
+    if stat.buyOrderCount ~= 0 or stat.sellOrderCount ~= 0 then
+        if self.statistics[nItemId] == nil then
+            self.statistics[nItemId] = {}
+        end
+        local timestamp = GetTime()
+        stat.time = timestamp
+        -- if self.statistics[nItemId][timestamp] == nil then
+        --     self.statistics[nItemId][timestamp] = stat
+        -- end
+        self.statistics[nItemId][timestamp] = stat
     end
 
-    -- tooltip content
-    local tTooltips = Apollo.GetAddon("ToolTips")
-    if (tTooltips == nil) then return end
-    -- CreateCallNames is run right after a tooltip is instantiated.
-    local origCreateCallNames = tTooltips.CreateCallNames
-    tTooltips.CreateCallNames = function(luaCaller)
-        origCreateCallNames(luaCaller)
-        local origItemTooltip = Tooltip.GetItemTooltipForm
-        Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
-            wndControl:SetTooltipDoc(nil)
-            local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
-            if (wndTooltip ~= nil) and item:IsCommodity() then
-                local itemID = item:GetItemId()
-                local latestValues = self:GetMostRecentValues(itemID)
-                if latestValues then
-                    local offset = 20
-                    local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
-                    extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1)
-                    extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10)
-                    extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50)
-                    extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1)
-                    extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10)
-                    extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50)
-                    GeminiLocale:TranslateWindow(L, extra)
-                    local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
-                    local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
-                    extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
-                    wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
-                end
-            end
-            return wndTooltip, wndTooltipComp
+    if self.isScanning then
+        self.queueSize = self.queueSize - 1
+        if self.queueSize == 0 then
+            self.ScanButton:SetText(L["Finished!"])
+            self.ScanButton:Enable(true)
+            self.isScanning = false
         end
     end
+end
+
+function CommodityStats:CreateCallNames(luaCaller)
+    local origItemTooltip = Tooltip.GetItemTooltipForm
+    Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
+        wndControl:SetTooltipDoc(nil)
+        local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+        if (wndTooltip ~= nil) and item:IsCommodity() then
+            local itemID = item:GetItemId()
+            local latestValues = self:GetMostRecentValues(itemID)
+            if latestValues then
+                local offset = 20
+                local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
+                extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1)
+                extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10)
+                extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50)
+                extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1)
+                extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10)
+                extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50)
+                GeminiLocale:TranslateWindow(L, extra)
+                local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
+                local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
+                extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
+                wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
+            end
+        end
+        return wndTooltip, wndTooltipComp
+    end
+end
+
+function CommodityStats:OnPostCustomMessage(luaCaller, strMessage, bResultOK, nDuration)
+    if self.messageWindow ~= nil then self.messageWindow:Destroy() end
+    self.messageWindow = Apollo.LoadForm(self.Xml, "MessageWindow", nil, self)
+    self.messageWindow:SetText(strMessage)
+    self.messageWindow:Show(true)
+    self.messageWindow:ToFront()
+    self.messageTimer:Stop()
+    self.messageTimer:Start()
 end
 
 function CommodityStats:OnClearMessageTimer()
@@ -341,31 +373,6 @@ function CommodityStats:GetMostRecentValues(itemID)
     if lastTime < 1 then return false end
     if statistics[lastTime].buyOrderCount == 0 and statistics[lastTime].sellOrderCount == 0 then return false end
     return statistics[lastTime]
-end
-
-function CommodityStats:OnCommodityInfoResults(nItemId, tStats, tOrders)
-    glog:debug("Commodity info received for item ID " .. tostring(nItemId) .. ".")
-    local stat = self:CreateCommodityStat(tStats)
-    if stat.buyOrderCount ~= 0 or stat.sellOrderCount ~= 0 then
-        if self.statistics[nItemId] == nil then
-            self.statistics[nItemId] = {}
-        end
-        local timestamp = GetTime()
-        stat.time = timestamp
-        -- if self.statistics[nItemId][timestamp] == nil then
-        --     self.statistics[nItemId][timestamp] = stat
-        -- end
-        self.statistics[nItemId][timestamp] = stat
-    end
-
-    if self.isScanning then
-        self.queueSize = self.queueSize - 1
-        if self.queueSize == 0 then
-            self.ScanButton:SetText(L["Finished!"])
-            self.ScanButton:Enable(true)
-            self.isScanning = false
-        end
-    end
 end
 
 function CommodityStats:OnCREDDExchangeInfoResults(arMarketStats, arOrders)
@@ -1113,8 +1120,12 @@ function CommodityStats:OnScanData( wndHandler, wndControl, eMouseButton )
     end
 end
 
-function CommodityStats:OnRequestStatistics( wndHandler, wndControl, eMouseButton )
-    local itemID = wndControl:GetParent():GetName()
+function CommodityStats:RequestStatistics(nItemId)
+    Event_FireGenericEvent("RequestStatistics", nil, nil, nil, nItemId)
+end
+
+function CommodityStats:OnRequestStatistics( wndHandler, wndControl, eMouseButton, nItemId )
+    local itemID = nItemId or wndControl:GetParent():GetName()
     if self.wndMain:IsVisible() then
         if self.wndMain:FindChild("txtItemID"):GetText() == itemID then
             self.wndMain:Show(false)
