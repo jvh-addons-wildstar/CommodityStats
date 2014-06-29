@@ -401,7 +401,7 @@ function CommodityStats:CreateCommodityStat(tStats)
     stat.sellPrices = {}
     stat.sellPrices.top1 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP1].monPrice:GetAmount()
     stat.sellPrices.top10 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP10].monPrice:GetAmount()
-stat.sellPrices.top50 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP50].monPrice:GetAmount()
+    stat.sellPrices.top50 = tStats.arSellOrderPrices[CommodityStats.Pricegroup.TOP50].monPrice:GetAmount()
     return stat
 end
 
@@ -557,8 +557,9 @@ function CommodityStats:LoadStatisticsForm()
     end)
     self.plot:SetOption("aPlotColors", self:GetPlotColors(self.settings.orderType))
     self.plot:SetOption("wndOverlayMouseEventCallback", function(tData, eType)
-        glog:debug("Mouse event " .. eType)
-        glog:debug(tData)
+        if eType == PixiePlot.MOUSE_UP then
+            self:ShowDataPointOptions(tData)
+        end
     end)
 
 
@@ -587,6 +588,22 @@ function CommodityStats:GetPlotColors(nOrderType)
     if nOrderType == CommodityStats.OrderType.BUY then
         return {clrBuyTop1, clrBuyTop10, clrBuyTop50 }
     end
+end
+
+function CommodityStats:ShowDataPointOptions(tData)
+    if self.wndDataPoint ~= nil then self.wndDataPoint:Destroy() end
+
+    self.wndDataPoint = Apollo.LoadForm(self.Xml, "DataPointForm", nil, self)
+    self.wndDataPoint:FindChild("monPrice"):SetAmount(tData.y)
+    self.wndDataPoint:FindChild("txtTime"):SetText(os.date(self.settings.dateFormatString, tData.x))
+    self.wndDataPoint:SetData(tData)
+
+    local mouseLoc = Apollo.GetMouse()
+    self.wndDataPoint:Move(mouseLoc.x, mouseLoc.y, self.wndDataPoint:GetWidth(), self.wndDataPoint:GetHeight())
+    self.wndDataPoint:ToFront()
+
+    GeminiLocale:TranslateWindow(L, self.wndDataPoint)
+    self.wndDataPoint:Invoke()
 end
 
 function CommodityStats:EstimateProfits(prices)
@@ -936,11 +953,11 @@ function CommodityStats:DisplayTransactions(itemID)
             for i, transaction in ipairs(self.transactions[itemID]) do
                 if transaction.result == CommodityStats.Result.BUYSUCCESS then 
                     buyQuantity = buyQuantity + transaction.quantity
-                    buyTotal = buyTotal + transaction.price
+                    buyTotal = buyTotal + (transaction.quantity * transaction.price)
                 end
                 if transaction.result == CommodityStats.Result.SELLSUCCESS then
                     sellQuantity = sellQuantity + transaction.quantity
-                    sellTotal = sellTotal + transaction.price
+                    sellTotal = sellTotal + (transaction.quantity * transaction.price)
                 end
                 table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
             end
@@ -1423,6 +1440,40 @@ end
 function CommodityStats:OnAdvancedSearch( wndHandler, wndControl, eMouseButton )
     self.plugins:InitSearchWindow(self.searchPosition, self.settings.latestSearch)
 end
+
+---------------------------------------------------------------------------------------------------
+-- DataPointForm Functions
+---------------------------------------------------------------------------------------------------
+
+function CommodityStats:OnPricePointCancel( wndHandler, wndControl, eMouseButton )
+    if self.wndDataPoint ~= nil then
+        self.wndDataPoint:Show(false)
+    end
+end
+
+function CommodityStats:OnDeleteSinglePricePoint( wndHandler, wndControl, eMouseButton )
+    local tData = wndControl:GetParent():GetData()
+    local prices = self.statistics[self.currentItemID][tData.x]
+    if prices.buyPrices.top1 == tData.y then prices.buyPrices.top1 = 0 end
+    if prices.buyPrices.top10 == tData.y then prices.buyPrices.top10 = 0 end
+    if prices.buyPrices.top50 == tData.y then prices.buyPrices.top50 = 0 end
+    if prices.sellPrices.top1 == tData.y then prices.sellPrices.top1 = 0 end
+    if prices.sellPrices.top10 == tData.y then prices.sellPrices.top10 = 0 end
+    if prices.sellPrices.top50 == tData.y then prices.sellPrices.top50 = 0 end
+    
+    self.statistics[self.currentItemID][tData.x] = priceSubtitle
+    self.wndDataPoint:Show(false)
+    self:LoadStatisticsForm()
+end
+
+function CommodityStats:OnDeleteFullPricePoint( wndHandler, wndControl, eMouseButton )
+    local tData = wndControl:GetParent():GetData()
+    self.statistics[self.currentItemID][tData.x] = nil
+
+    self.wndDataPoint:Show(false)
+    self:LoadStatisticsForm()
+end
+
 
 local CommodityStatsInst = CommodityStats:new()
 CommodityStatsInst:Init()
