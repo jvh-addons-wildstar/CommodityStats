@@ -421,7 +421,7 @@ function CommodityStats:OnSave(eLevel)
     local mainPosLeft, mainPosTop = self.wndMain:GetPos()
     local commPosLeft, commPosTop = self.MarketplaceCommodity.wndMain:GetPos()
     if self.plugins.wndSearch ~= nil then
-        searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
+        local searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
         if searchPosLeft ~= nil then
             save.searchPosition = { left = searchPosLeft, top = searchPosTop }
         elseif self.searchPosition ~= nil then
@@ -880,7 +880,7 @@ end
 function GetTime()
     -- this function returns unix epoch time. We do some extra trickery to round the time to hours, since we don't need stats as detailed as every minute/second
     local time = GameLib.GetLocalTime()
-    timeargs = {}
+    local timeargs = {}
     timeargs.year = time.nYear
     timeargs.month = time.nMonth
     timeargs.day = time.nDay
