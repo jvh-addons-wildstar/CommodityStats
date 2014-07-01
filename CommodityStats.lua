@@ -158,7 +158,7 @@ end
 function CommodityStats:Initialize(luaCaller)
     if luaCaller == self.MarketplaceCREDD then
         if self.CREDDStatButton ~= nil then self.CREDDStatButton:Destroy() end
-        self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", luaCaller.wndMain:FindChild("ActLater"), self)
+        self.CREDDStatButton = Apollo.LoadForm(self.Xml, "CREDDStatButton", luaCaller.tWindowMap["Main"]:FindChild("ActLater"), self)
         self.CREDDStatButton:SetTooltip(L["Show price/transaction history"])
     end
 
@@ -1056,7 +1056,7 @@ function CommodityStats:Singularize(s)
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
-                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp"}
+                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp", "shadeslate"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
