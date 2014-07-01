@@ -408,7 +408,7 @@ end
 function CommodityStats:OnSave(eLevel)
     if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Realm then
         return nil
-    end 
+    end
 
     local save = {
         statistics = self.statistics,
@@ -417,20 +417,19 @@ function CommodityStats:OnSave(eLevel)
         lastAverageRun = self.lastAverageRun
     }
 
-    -- save window positions
-    local mainPosLeft, mainPosTop = self.wndMain:GetPos()
-    local commPosLeft, commPosTop = self.MarketplaceCommodity.wndMain:GetPos()
-    if self.plugins.wndSearch ~= nil then
-        local searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
-        if searchPosLeft ~= nil then
-            save.searchPosition = { left = searchPosLeft, top = searchPosTop }
-        elseif self.searchPosition ~= nil then
-            save.searchPosition = self.searchPosition
-        end
-    end
-    save.mainPosition = { left = mainPosLeft, top = mainPosTop }
-    save.commPosition = { left = commPosLeft, top = commPosTop }
-
+    -- -- save window positions
+    -- local mainPosLeft, mainPosTop = self.wndMain:GetPos()
+    -- local commPosLeft, commPosTop = self.MarketplaceCommodity.wndMain:GetPos()
+    -- if self.plugins.wndSearch ~= nil then
+    --     local searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
+    --     if searchPosLeft ~= nil then
+    --         save.searchPosition = { left = searchPosLeft, top = searchPosTop }
+    --     elseif self.searchPosition ~= nil then
+    --         save.searchPosition = self.searchPosition
+    --     end
+    -- end
+    -- save.mainPosition = { left = mainPosLeft, top = mainPosTop }
+    -- save.commPosition = { left = commPosLeft, top = commPosTop }
     return save
 end
 
