@@ -93,17 +93,22 @@ function CommodityStats:new(o)
 end
 
 function CommodityStats:Init()
-    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity", "MarketplaceCREDD", "Gemini:Logging-1.2", "Gemini:Locale-1.0", "Gemini:Hook-1.0"})
-    Apollo.RegisterEventHandler("MailBoxActivate", "OnMailboxOpen", self)
-    Apollo.RegisterEventHandler("ToggleMailWindow", "OnMailboxOpen", self)
-    Apollo.RegisterEventHandler("CommodityInfoResults", "OnCommodityInfoResultsNative", self)
-    Apollo.RegisterEventHandler("CREDDExchangeInfoResults", "OnCREDDExchangeInfoResults", self)
-    Apollo.RegisterEventHandler("ItemRemoved", "OnItemRemoved", self)
-    Apollo.RegisterEventHandler("PluginManagerMessage", "OnPluginManagerMessage", self)
-    Apollo.RegisterEventHandler("PluginManagerSearchSelected", "OnPluginSearchSelected", self)
-    Apollo.RegisterEventHandler("RequestStatistics", "OnRequestStatistics", self)
-    Apollo.RegisterSlashCommand("commoditystats", "OnConfigure", self)
-    Apollo.RegisterSlashCommand("cs", "OnConfigure", self)
+    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity",
+                                                        "MarketplaceCREDD",
+                                                        "Gemini:Logging-1.2",
+                                                        "Gemini:Locale-1.0",
+                                                        "Gemini:Hook-1.0"})
+    Apollo.RegisterEventHandler("WindowManagementReady",        "OnWindowManagementReady", self)
+    Apollo.RegisterEventHandler("MailBoxActivate",              "OnMailboxOpen", self)
+    Apollo.RegisterEventHandler("ToggleMailWindow",             "OnMailboxOpen", self)
+    Apollo.RegisterEventHandler("CommodityInfoResults",         "OnCommodityInfoResultsNative", self)
+    Apollo.RegisterEventHandler("CREDDExchangeInfoResults",     "OnCREDDExchangeInfoResults", self)
+    Apollo.RegisterEventHandler("ItemRemoved",                  "OnItemRemoved", self)
+    Apollo.RegisterEventHandler("PluginManagerMessage",         "OnPluginManagerMessage", self)
+    Apollo.RegisterEventHandler("PluginManagerSearchSelected",  "OnPluginSearchSelected", self)
+    Apollo.RegisterEventHandler("RequestStatistics",            "OnRequestStatistics", self)
+    Apollo.RegisterSlashCommand("commoditystats",               "OnConfigure", self)
+    Apollo.RegisterSlashCommand("cs",                           "OnConfigure", self)
 end
 
 function CommodityStats:OnLoad()
@@ -169,10 +174,6 @@ function CommodityStats:Initialize(luaCaller)
         if self.plugins:GetPluginCount() > 0 then
             local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", luaCaller.wndMain, self)
             searchButton:SetText(L["Search"])
-        end
-        -- restore previous window position (which it really should do out of the box imo)
-        if self.commPosition ~= nil then
-            luaCaller.wndMain:Move(self.commPosition.left, self.commPosition.top, luaCaller.wndMain:GetWidth(), luaCaller.wndMain:GetHeight())
         end
         -- Get CREDD info separately since it's not part of the CX, but we want the history on it.
         CREDDExchangeLib.RequestExchangeInfo()
@@ -405,6 +406,10 @@ function CommodityStats:CreateCommodityStat(tStats)
     return stat
 end
 
+function CommodityStats:OnWindowManagementReady()
+    Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "CommodityStats_Main"})
+end
+
 function CommodityStats:OnSave(eLevel)
     if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Realm then
         return nil
@@ -443,12 +448,6 @@ function CommodityStats:OnRestore(eLevel, tData)
         self:PurgeExpiredStats()
         self:AverageStatistics()
     end
-    -- restore window positions
-    if tData.mainPosition ~= nil then
-        self.wndMain:Move(tData.mainPosition.left, tData.mainPosition.top, self.wndMain:GetWidth(), self.wndMain:GetHeight())
-    end
-    if tData.commPosition ~= nil then self.commPosition = tData.commPosition end
-    if tData.searchPosition ~= nil then self.searchPosition = tData.searchPosition end
 end
 
 function CommodityStats:DrawColorNotes()
@@ -1437,7 +1436,7 @@ function CommodityStats:OnChangeAutoQuantity( wndHandler, wndControl, eMouseButt
 end
 
 function CommodityStats:OnAdvancedSearch( wndHandler, wndControl, eMouseButton )
-    self.plugins:InitSearchWindow(self.searchPosition, self.settings.latestSearch)
+    self.plugins:InitSearchWindow(self.settings.latestSearch)
 end
 
 ---------------------------------------------------------------------------------------------------

@@ -3,7 +3,9 @@ local PluginManager = {}
 function PluginManager.Init(cs)
 	local self = {
 		searchPlugins = {}
+		wndSearch = Apollo.LoadForm(cs.Xml, "AdvancedSearch", nil, self)
 	}
+	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
 
 	function self:AddSearch(buttonText, searchCallback, searchWindowXML, searchWindowName, tHandler)
 		-- buttonText = name of the entry in the search menu
@@ -20,15 +22,16 @@ function PluginManager.Init(cs)
 		Event_FireGenericEvent("PluginManagerMessage", "Added search plugin with title: " .. buttonText .. ".")
 	end
 
-	function self:InitSearchWindow(position, selected)
+	function self:OnWindowManagementReady()
+    	Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndSearch, strName = "CommodityStats_Search"})
+	end
+
+	function self:InitSearchWindow(selected)
 		if count(self.searchPlugins) == 0 then
 			Event_FireGenericEvent("PluginManagerMessage", "No search plugins found. Nothing to do here.")
 			return
 		end
-		self.wndSearch = Apollo.LoadForm(cs.Xml, "AdvancedSearch", nil, self)
-		if position ~= nil then
-			self.wndSearch:Move(position.left, position.top, self.wndSearch:GetWidth(), self.wndSearch:GetHeight())
-		end
+
 		self.wndResultList = self.wndSearch:FindChild("ResultList")
 		local dropdown = self.wndSearch:FindChild("cboSearches")
 		local selectedSearch = self.wndSearch:FindChild("txtSelectedSearch")
