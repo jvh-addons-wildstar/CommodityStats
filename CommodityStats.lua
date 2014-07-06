@@ -1054,7 +1054,7 @@ function CommodityStats:Singularize(s)
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
-                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp", "shadeslate"}
+                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp", "shadeslate", "novacites"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
