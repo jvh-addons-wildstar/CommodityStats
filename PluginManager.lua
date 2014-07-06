@@ -2,7 +2,7 @@ local PluginManager = {}
 
 function PluginManager.Init(cs)
 	local self = {
-		searchPlugins = {}
+		searchPlugins = {},
 		wndSearch = Apollo.LoadForm(cs.Xml, "AdvancedSearch", nil, self)
 	}
 	Apollo.RegisterEventHandler("WindowManagementReady", "OnWindowManagementReady", self)
