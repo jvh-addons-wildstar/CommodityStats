@@ -95,6 +95,7 @@ end
 function CommodityStats:Init()
     Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity",
                                                         "MarketplaceCREDD",
+                                                        "MarketplaceListings",
                                                         "Gemini:Logging-1.2",
                                                         "Gemini:Locale-1.0",
                                                         "Gemini:Hook-1.0"})
@@ -158,6 +159,9 @@ function CommodityStats:InitializeHooks()
 
     -- tooltip content
     self:PostHook(Apollo.GetAddon("ToolTips"), "CreateCallNames")
+
+    -- 1 click auction cancel
+    self:PostHook(Apollo.GetAddon("MarketplaceListings"), "OnCancelBtn")
 end
 
 function CommodityStats:Initialize(luaCaller)
@@ -177,6 +181,16 @@ function CommodityStats:Initialize(luaCaller)
         end
         -- Get CREDD info separately since it's not part of the CX, but we want the history on it.
         CREDDExchangeLib.RequestExchangeInfo()
+    end
+end
+
+function CommodityStats:OnCancelBtn(luaCaller, wndHandler, wndControl)
+    if wndHandler:GetName() == "CommodityCancelBtn" then
+        luaCaller:OnCommodityCancelConfirmBtn(wndHandler, wndControl)
+    elseif wndHandler:GetName() == "AuctionCancelBtn" then
+        luaCaller:OnAuctionCancelConfirmBtn(wndHandler, wndControl)
+    else
+        luaCaller:OnCreddCancelConfirmBtn(wndHandler, wndControl)
     end
 end
 
