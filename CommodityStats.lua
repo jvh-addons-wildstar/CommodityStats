@@ -158,7 +158,10 @@ function CommodityStats:InitializeHooks()
     self:RawHook(self.MarketplaceCommodity, "OnPostCustomMessage")
 
     -- tooltip content
-    self:PostHook(Apollo.GetAddon("ToolTips"), "CreateCallNames")
+    local tooltips = Apollo.GetAddon("ToolTips")
+    if tooltips.CreateCallNames ~= nil then
+        self:PostHook(tooltips, "CreateCallNames")
+    end
 
     -- 1 click auction cancel
     self:PostHook(Apollo.GetAddon("MarketplaceListings"), "OnCancelBtn")
@@ -699,7 +702,7 @@ function CommodityStats:PurgeExpiredStats()
         local counter = 0
         local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
         for index, item in pairs(self.statistics) do
-            if type(index) == 'number' then
+            if type(index) == 'number' or index == CREDDid then
                 for timestamp, stat in pairs(item) do
                     if type(timestamp) == 'number' then
                         if timestamp <= minimumTime then
@@ -1066,9 +1069,9 @@ function CommodityStats:Singularize(s)
     -- Auction mails pluralize certain item names if multiple items were bought/sold.
     -- We need the singular form in order to actually find the item ID.
     -- This is mostly guesswork. If anyone knows a better way to handle this, please let me know.
-    local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast",
-                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", 
-                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "sample", "amp", "shadeslate", "novacite"}
+    local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast", "melon",
+                    "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", "medishot",
+                    "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "amp", "shadeslate", "novacite", "essence"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
