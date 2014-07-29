@@ -158,7 +158,7 @@ function CommodityStats:InitializeHooks()
     self:RawHook(self.MarketplaceCommodity, "OnPostCustomMessage")
 
     -- tooltip content
-    local tooltips = Apollo.GetAddon("ToolTips")
+    local tooltips = Apollo.GetAddon("ToolTips") or Apollo.GetAddon("VikingTooltips")
     if tooltips.CreateCallNames ~= nil then
         self:PostHook(tooltips, "CreateCallNames")
     end
@@ -1072,7 +1072,7 @@ function CommodityStats:Singularize(s)
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast", "melon",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", "medishot",
                     "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "amp", "shadeslate", "novacite", "essence",
-                    "starshard", "hydrogem"}
+                    "starshard", "hydrogem", "bloodbriar", "diamond", "wheat", "octopod", "risotto"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
