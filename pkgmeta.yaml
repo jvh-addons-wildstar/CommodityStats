@@ -1,1 +1,14 @@
 package-as: CommodityStats
+externals:
+    libs/GeminiHook:
+        url: https://github.com/wildstarnasa/GeminiHook.git
+        tag: latest # if this line is left out, the latest version (even if it's not a tag) is assumed
+    libs/GeminiLocale:
+        url: https://github.com/wildstarnasa/GeminiLocale.git
+        tag: latest # if this line is left out, the latest version (even if it's not a tag) is assumed
+    libs/GeminiLogging:
+        url: https://github.com/wildstarnasa/GeminiLogging.git
+        tag: latest # if this line is left out, the latest version (even if it's not a tag) is assumed
+    libs/PixiePlot:
+        url: https://github.com/wildstarnasa/PixiePlot.git
+        tag: latest # if this line is left out, the latest version (even if it's not a tag) is assumed

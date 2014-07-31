@@ -929,7 +929,7 @@ function CommodityStats:OnMailboxOpen()
             if info.eSenderType == MailSystemLib.EmailType_CommodityAuction and info.bIsRead == false then
                 if info.strBody:lower():find("seller has been found") then
                     itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.BUYSUCCESS)
-                elseif info.strBody:lower():find("buyer has been found") then
+                elseif info.strBody:lower():find("buyer has purchased") then
                     itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.SELLSUCCESS)
                 elseif info.strBody:lower():find("buy order") then
                     itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.BUYEXPIRED)
