@@ -98,7 +98,8 @@ function CommodityStats:Init()
                                                         "MarketplaceListings",
                                                         "Gemini:Logging-1.2",
                                                         "Gemini:Locale-1.0",
-                                                        "Gemini:Hook-1.0"})
+                                                        "Gemini:Hook-1.0",
+                                                        "Drafto:Lib:PixiePlot-1.4"})
     Apollo.RegisterEventHandler("WindowManagementReady",        "OnWindowManagementReady", self)
     Apollo.RegisterEventHandler("MailBoxActivate",              "OnMailboxOpen", self)
     Apollo.RegisterEventHandler("ToggleMailWindow",             "OnMailboxOpen", self)
