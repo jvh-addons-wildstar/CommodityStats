@@ -2,8 +2,61 @@
 require "Window"
  
 local PixiePlot, GeminiLogging, glog, GeminiLocale, L
-local CommodityStats = {}
 
+-- initialization
+local CommodityStats = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(
+																NAME, 
+																true, 
+																{ 
+																	"MarketplaceCommodity",
+																	"MarketplaceCREDD",
+																	"MarketplaceListings",
+																	"Gemini:Logging-1.2",
+																	"Gemini:Locale-1.0",                                                        
+																	"Drafto:Lib:PixiePlot-1.4"
+																},
+																"Gemini:Hook-1.0"
+															)
+															
+Apollo.RegisterEventHandler("WindowManagementReady",        "OnWindowManagementReady", CommodityStats)
+Apollo.RegisterEventHandler("MailBoxActivate",              "OnMailboxOpen", CommodityStats)
+Apollo.RegisterEventHandler("ToggleMailWindow",             "OnMailboxOpen", CommodityStats)
+Apollo.RegisterEventHandler("CommodityInfoResults",         "OnCommodityInfoResultsNative", CommodityStats)
+Apollo.RegisterEventHandler("CREDDExchangeInfoResults",     "OnCREDDExchangeInfoResults", CommodityStats)
+Apollo.RegisterEventHandler("ItemRemoved",                  "OnItemRemoved", CommodityStats)
+Apollo.RegisterEventHandler("PluginManagerMessage",         "OnPluginManagerMessage", CommodityStats)
+Apollo.RegisterEventHandler("PluginManagerSearchSelected",  "OnPluginSearchSelected", CommodityStats)
+Apollo.RegisterEventHandler("RequestStatistics",            "OnRequestStatistics", CommodityStats)
+Apollo.RegisterSlashCommand("commoditystats",               "OnConfigure", CommodityStats)
+Apollo.RegisterSlashCommand("cs",                           "OnConfigure", CommodityStats)															
+		
+CommodityStats.categoryQueue = {}
+CommodityStats.statistics = {}
+CommodityStats.transactions = {}
+CommodityStats.settings = {}
+CommodityStats.currentItemID = 0
+CommodityStats.queueSize = 0
+CommodityStats.lastAverageRun = 0
+CommodityStats.isScanning = false
+
+-- default values
+CommodityStats.settings = {
+	daysToKeep = 60,
+	daysUntilAverage = 7,
+	dateFormatString = CommodityStats.DateFormat.DDMM,
+	orderType = CommodityStats.OrderType.BOTH,
+	baseSellPrice = CommodityStats.Pricegroup.TOP1,
+	sellStrategy = CommodityStats.Strategy.MATCH,
+	sellUndercutPercentage = 5,
+	sellUndercutFixed = 100,
+	baseBuyPrice = CommodityStats.Pricegroup.TOP1,
+	buyStrategy = CommodityStats.Strategy.MATCH,
+	buyIncreasePercentage = 5,
+	buyIncreaseFixed = 100,
+	lastSelectedTab = nil
+}
+
+		
 local secondsInDay = 86400
 local secondsInHour = 3600
 local clrSellTop1 = {a=1,r=1,g=0,b=0}
@@ -57,63 +110,9 @@ CommodityStats.Pricegroup = {
     TOP10 = 2,
     TOP50 = 3
 }
-
  
-function CommodityStats:new(o)
-    o = o or {}
-    setmetatable(o, self)
-    self.__index = self
-    self.categoryQueue = {}
-    self.statistics = {}
-    self.transactions = {}
-    self.settings = {}
-    self.currentItemID = 0
-    self.queueSize = 0
-    self.lastAverageRun = 0
-    self.isScanning = false
-
-    -- default values
-    self.settings = {
-        daysToKeep = 60,
-        daysUntilAverage = 7,
-        dateFormatString = CommodityStats.DateFormat.DDMM,
-        orderType = CommodityStats.OrderType.BOTH,
-        baseSellPrice = CommodityStats.Pricegroup.TOP1,
-        sellStrategy = CommodityStats.Strategy.MATCH,
-        sellUndercutPercentage = 5,
-        sellUndercutFixed = 100,
-        baseBuyPrice = CommodityStats.Pricegroup.TOP1,
-        buyStrategy = CommodityStats.Strategy.MATCH,
-        buyIncreasePercentage = 5,
-        buyIncreaseFixed = 100,
-        lastSelectedTab = nil
-    }
-
-    return o
-end
-
-function CommodityStats:Init()
-    Apollo.RegisterAddon(self, true, "CommodityStats", {"MarketplaceCommodity",
-                                                        "MarketplaceCREDD",
-                                                        "MarketplaceListings",
-                                                        "Gemini:Logging-1.2",
-                                                        "Gemini:Locale-1.0",
-                                                        "Gemini:Hook-1.0",
-                                                        "Drafto:Lib:PixiePlot-1.4"})
-    Apollo.RegisterEventHandler("WindowManagementReady",        "OnWindowManagementReady", self)
-    Apollo.RegisterEventHandler("MailBoxActivate",              "OnMailboxOpen", self)
-    Apollo.RegisterEventHandler("ToggleMailWindow",             "OnMailboxOpen", self)
-    Apollo.RegisterEventHandler("CommodityInfoResults",         "OnCommodityInfoResultsNative", self)
-    Apollo.RegisterEventHandler("CREDDExchangeInfoResults",     "OnCREDDExchangeInfoResults", self)
-    Apollo.RegisterEventHandler("ItemRemoved",                  "OnItemRemoved", self)
-    Apollo.RegisterEventHandler("PluginManagerMessage",         "OnPluginManagerMessage", self)
-    Apollo.RegisterEventHandler("PluginManagerSearchSelected",  "OnPluginSearchSelected", self)
-    Apollo.RegisterEventHandler("RequestStatistics",            "OnRequestStatistics", self)
-    Apollo.RegisterSlashCommand("commoditystats",               "OnConfigure", self)
-    Apollo.RegisterSlashCommand("cs",                           "OnConfigure", self)
-end
-
-function CommodityStats:OnLoad()
+-- OnIntialize replaces OnLoad with GeminiAddon
+function CommodityStats:OnInitialize()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
@@ -1490,7 +1489,3 @@ function CommodityStats:OnDeleteFullPricePoint( wndHandler, wndControl, eMouseBu
     self.wndDataPoint:Show(false)
     self:LoadStatisticsForm()
 end
-
-
-local CommodityStatsInst = CommodityStats:new()
-CommodityStatsInst:Init()
