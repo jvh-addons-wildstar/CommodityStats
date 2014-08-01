@@ -5,7 +5,7 @@
     <Script Name="libs\GeminiHook\GeminiHook-1.0.lua" />
     <Script Name="libs\PixiePlot\XmlDocument.lua" />
     <Script Name="libs\PixiePlot\PixiePlot.lua" />
-	<SCript Name="libs\GeminiAddon\Gemini:Addon-1.1" />
+	<Script Name="libs\GeminiAddon\GeminiAddon.lua" />
     <Script Name="locale\enUS.lua"/>
     <Script Name="locale\deDE.lua"/>
     <Script Name="locale\frFR.lua"/>

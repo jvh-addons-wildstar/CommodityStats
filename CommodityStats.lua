@@ -5,7 +5,7 @@ local PixiePlot, GeminiLogging, glog, GeminiLocale, L
 
 -- initialization
 local CommodityStats = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(
-																NAME, 
+																"CommodityStats", 
 																true, 
 																{ 
 																	"MarketplaceCommodity",
@@ -17,7 +17,50 @@ local CommodityStats = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(
 																},
 																"Gemini:Hook-1.0"
 															)
-															
+
+-- OrderTypes
+CommodityStats.OrderType = {
+    BOTH = 0,
+    BUY = 1,
+    SELL = 2
+}
+
+-- Transaction results
+CommodityStats.Result = {
+    BUYSUCCESS = 0,
+    SELLSUCCESS = 1,
+    BUYEXPIRED = 2,
+    SELLEXPIRED = 3
+}
+
+-- DateTime formats
+CommodityStats.DateFormat = {
+    DDMM = "%d/%m %H:%M",
+    MMDD = "%m/%d %H:%M"
+}
+
+-- categories
+CommodityStats.Category = {
+    SELLORDER = "HeaderSellOrderBtn",
+    BUYORDER = "HeaderBuyOrderBtn",
+    SELLNOW = "HeaderSellNowBtn",
+    BUYNOW = "HeaderBuyNowBtn"
+}
+
+-- Price Undercut/Increase strategies
+CommodityStats.Strategy = {
+    MATCH = 0,
+    FIXED = 1,
+    PERCENTAGE = 2
+}
+
+-- Price groups
+CommodityStats.Pricegroup = {
+    TOP1 = 1,
+    TOP10 = 2,
+    TOP50 = 3
+}
+	
 Apollo.RegisterEventHandler("WindowManagementReady",        "OnWindowManagementReady", CommodityStats)
 Apollo.RegisterEventHandler("MailBoxActivate",              "OnMailboxOpen", CommodityStats)
 Apollo.RegisterEventHandler("ToggleMailWindow",             "OnMailboxOpen", CommodityStats)
@@ -68,48 +111,6 @@ local clrBuyTop50 = {a=1,r=0.8,g=1,b=0.8}
 local CREDDid = "999999"
 local transactionListItems = {}
 
--- OrderTypes
-CommodityStats.OrderType = {
-    BOTH = 0,
-    BUY = 1,
-    SELL = 2
-}
-
--- Transaction results
-CommodityStats.Result = {
-    BUYSUCCESS = 0,
-    SELLSUCCESS = 1,
-    BUYEXPIRED = 2,
-    SELLEXPIRED = 3
-}
-
--- DateTime formats
-CommodityStats.DateFormat = {
-    DDMM = "%d/%m %H:%M",
-    MMDD = "%m/%d %H:%M"
-}
-
--- categories
-CommodityStats.Category = {
-    SELLORDER = "HeaderSellOrderBtn",
-    BUYORDER = "HeaderBuyOrderBtn",
-    SELLNOW = "HeaderSellNowBtn",
-    BUYNOW = "HeaderBuyNowBtn"
-}
-
--- Price Undercut/Increase strategies
-CommodityStats.Strategy = {
-    MATCH = 0,
-    FIXED = 1,
-    PERCENTAGE = 2
-}
-
--- Price groups
-CommodityStats.Pricegroup = {
-    TOP1 = 1,
-    TOP10 = 2,
-    TOP50 = 3
-}
  
 -- OnIntialize replaces OnLoad with GeminiAddon
 function CommodityStats:OnInitialize()
@@ -123,8 +124,6 @@ function CommodityStats:OnInitialize()
 
     GeminiLocale = Apollo.GetPackage("Gemini:Locale-1.0").tPackage
     L = GeminiLocale:GetLocale("CommodityStats", false)
-
-    Apollo.GetPackage("Gemini:Hook-1.0").tPackage:Embed(self)
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
