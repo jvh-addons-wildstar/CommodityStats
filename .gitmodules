@@ -1,0 +1,15 @@
+[submodule "libs/GeminiHook"]
+	path = libs/GeminiHook
+	url = https://github.com/wildstarnasa/GeminiHook.git
+[submodule "libs/GeminiLocale"]
+	path = libs/GeminiLocale
+	url = https://github.com/wildstarnasa/GeminiLocale.git
+[submodule "libs/GeminiLogging"]
+	path = libs/GeminiLogging
+	url = https://github.com/wildstarnasa/GeminiLogging.git
+[submodule "libs/PixiePlot"]
+	path = libs/PixiePlot
+	url = https://github.com/wildstarnasa/PixiePlot.git
+[submodule "libs/GeminiAddon"]
+	path = libs/GeminiAddon
+	url = https://github.com/wildstarnasa/GeminiAddon.git
