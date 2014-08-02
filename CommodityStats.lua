@@ -4,9 +4,7 @@ require "Window"
 local PixiePlot, GeminiLogging, glog, GeminiLocale, L
 
 -- initialization
-local CommodityStats = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(
-																"CommodityStats", 
-																true, 
+local CommodityStats = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon("CommodityStats", true, 
 																{ 
 																	"MarketplaceCommodity",
 																	"MarketplaceCREDD",
