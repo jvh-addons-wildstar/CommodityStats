@@ -156,8 +156,10 @@ function CommodityStats:InitializeHooks()
 
     -- tooltip content
     local tooltips = Apollo.GetAddon("ToolTips") or Apollo.GetAddon("VikingTooltips")
-    if tooltips.CreateCallNames ~= nil then
-        self:PostHook(tooltips, "CreateCallNames")
+    if tooltips ~= nil then
+        if tooltips.CreateCallNames ~= nil then
+            self:PostHook(tooltips, "CreateCallNames")
+        end
     end
 
     -- 1 click auction cancel
