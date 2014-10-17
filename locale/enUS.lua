@@ -84,5 +84,7 @@ L["Search"] = true
 -- plural -> singular forms for transaction tracking
 L["singular"] = {
 	leaves = "leaf",
-	serpentlilies = "serpentlily"
+	serpentlilies = "serpentlily",
+	currries = "curry",
+	sorbets = "sorbet"
 }
