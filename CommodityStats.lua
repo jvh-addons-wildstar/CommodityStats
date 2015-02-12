@@ -713,7 +713,7 @@ function CommodityStats:PurgeExpiredStats()
             end
         end
         if counter > 0 then
-            glog:debug("Removed " .. tostring(counter) .. " statistics that were older than " .. tostring(self.settings.daysToKeep) .. ".")
+            glog:debug("Removed " .. tostring(counter) .. " statistics that were older than " .. tostring(self.settings.daysToKeep) .. " days.")
         end
     end
 end
