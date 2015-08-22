@@ -115,7 +115,7 @@ function CommodityStats:OnInitialize()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.WARN,
+        level = GeminiLogging.INFO,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -128,6 +128,7 @@ function CommodityStats:OnInitialize()
     GeminiLocale:TranslateWindow(L, self.wndMain)
 
     self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage.Init(self)
+    self.stats = Apollo.GetPackage("CommodityStats:Statistics").tPackage.Init()
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
@@ -258,15 +259,7 @@ function CommodityStats:OnCommodityInfoResultsNative(nItemId, tStats, tOrders)
     glog:debug("Commodity info received for item ID " .. tostring(nItemId) .. ".")
     local stat = self:CreateCommodityStat(tStats)
     if stat.buyOrderCount ~= 0 or stat.sellOrderCount ~= 0 then
-        if self.statistics[nItemId] == nil then
-            self.statistics[nItemId] = {}
-        end
-        local timestamp = GetTime()
-        stat.time = timestamp
-        -- if self.statistics[nItemId][timestamp] == nil then
-        --     self.statistics[nItemId][timestamp] = stat
-        -- end
-        self.statistics[nItemId][timestamp] = stat
+        self.stats:SaveStat(nItemId, stat)
     end
 
     if self.isScanning then
@@ -286,21 +279,23 @@ function CommodityStats:CreateCallNames(luaCaller)
         local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
         if (wndTooltip ~= nil) and item:IsCommodity() then
             local itemID = item:GetItemId()
-            local latestValues = self:GetMostRecentValues(itemID)
+            local latestValues = self.stats:GetLatestStatForItemid(itemID)
             if latestValues then
-                local offset = 20
-                local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
-                extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1 or 0)
-                extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10 or 0)
-                extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50 or 0)
-                extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1 or 0)
-                extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10 or 0)
-                extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50 or 0)
-                GeminiLocale:TranslateWindow(L, extra)
-                local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
-                local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
-                extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
-                wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
+                if latestValues.buyOrderCount ~= 0 or latestValues.sellOrderCount ~= 0 then -- pointless when there are no orders
+                    local offset = 20
+                    local extra = Apollo.LoadForm(self.Xml, "TooltipPriceInfo", wndTooltip, self)
+                    extra:FindChild("monBuyTop1"):SetAmount(latestValues.buyPrices.top1 or 0)
+                    extra:FindChild("monBuyTop10"):SetAmount(latestValues.buyPrices.top10 or 0)
+                    extra:FindChild("monBuyTop50"):SetAmount(latestValues.buyPrices.top50 or 0)
+                    extra:FindChild("monSellTop1"):SetAmount(latestValues.sellPrices.top1 or 0)
+                    extra:FindChild("monSellTop10"):SetAmount(latestValues.sellPrices.top10 or 0)
+                    extra:FindChild("monSellTop50"):SetAmount(latestValues.sellPrices.top50 or 0)
+                    GeminiLocale:TranslateWindow(L, extra)
+                    local eLeft, eTop, eRight, eBottom = extra:GetAnchorOffsets()
+                    local nLeft, nTop, nRight, nBottom = wndTooltip:GetAnchorOffsets()
+                    extra:SetAnchorOffsets(nLeft, nBottom - offset, nRight, nBottom + (eBottom - eTop - offset))
+                    wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
+                end
             end
         end
         return wndTooltip, wndTooltipComp
@@ -383,32 +378,17 @@ function CommodityStats:GetPrice(nItemId, tStats, selectedCategory)
     return price
 end
 
-function CommodityStats:GetMostRecentValues(itemID)
-    local statistics = self.statistics[itemID]
-    if statistics == nil then return false end
-    local lastTime = table.maxn(statistics)
-    if lastTime < 1 then return false end
-    if statistics[lastTime].buyOrderCount == 0 and statistics[lastTime].sellOrderCount == 0 then return false end
-    return statistics[lastTime]
-end
-
 function CommodityStats:OnCREDDExchangeInfoResults(arMarketStats, arOrders)
     glog:debug("Received CREDD info")
     local stat = self:CreateCommodityStat(arMarketStats)
     if stat.buyOrderCount ~= 0 or stat.sellOrderCount ~= 0 then
-        if self.statistics[CREDDid] == nil then
-            self.statistics[CREDDid] = {}
-        end
-        local timestamp = GetTime()
-        stat.time = timestamp
-        if self.statistics[CREDDid][timestamp] == nil then
-            self.statistics[CREDDid][timestamp] = stat
-        end
+        self.stats:SaveStat(CREDDid, stat)
     end
 end
 
 function CommodityStats:CreateCommodityStat(tStats)
     local stat = {}
+    stat.time = GetTime()
     stat.buyOrderCount = tStats.nBuyOrderCount
     stat.sellOrderCount = tStats.nSellOrderCount
     stat.buyPrices = {}
@@ -432,33 +412,18 @@ function CommodityStats:OnSave(eLevel)
     end
 
     local save = {
-        statistics = self.statistics,
+        stats = self.stats.d,
         transactions = self.transactions,
         settings = self.settings,
         lastAverageRun = self.lastAverageRun
     }
-
-    -- -- save window positions
-    -- local mainPosLeft, mainPosTop = self.wndMain:GetPos()
-    -- local commPosLeft, commPosTop = self.MarketplaceCommodity.wndMain:GetPos()
-    -- if self.plugins.wndSearch ~= nil then
-    --     local searchPosLeft, searchPosTop = self.plugins.wndSearch:GetPos()
-    --     if searchPosLeft ~= nil then
-    --         save.searchPosition = { left = searchPosLeft, top = searchPosTop }
-    --     elseif self.searchPosition ~= nil then
-    --         save.searchPosition = self.searchPosition
-    --     end
-    -- end
-    -- save.mainPosition = { left = mainPosLeft, top = mainPosTop }
-    -- save.commPosition = { left = commPosLeft, top = commPosTop }
     return save
 end
 
 function CommodityStats:OnRestore(eLevel, tData)
     self.transactions = tData.transactions or {}
-    self.statistics = tData.statistics or {}
     self.lastAverageRun = tData.lastAverageRun or 0
-
+    self.stats:LoadData(tData.stats or {})
     if tData.settings ~= nil then
         self.settings = tData.settings
         self:PurgeExpiredStats()
@@ -496,7 +461,7 @@ function CommodityStats:LoadStatisticsForm()
     self.plot = PixiePlot:New(self.wndStatistics:FindChild("Plot"))
 
     self.plot:RemoveAllDataSets()
-    local stats = self.statistics[self.currentItemID]
+    local stats = self.stats:GetAllStatsForItemId(self.currentItemID)
     if stats == nil then
         local monTopBuy = self.wndStatistics:FindChild("monTopBuyPrice"):Show(false)
         local monTopSell = self.wndStatistics:FindChild("monTopSellPrice"):Show(false)
@@ -513,27 +478,22 @@ function CommodityStats:LoadStatisticsForm()
     local dsBuyTop10 = { xStart = 0, values = {} }
     local dsBuyTop50 = { xStart = 0, values = {} }
     local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
-    local current = earliest
     local now = GetTime()
     self.plot:SetXMin(earliest)
     self.plot:SetXMax(now)
     self.plot:SetYMin(minPrice)
     self.plot:SetYMax(maxPrice)
-    while current <= now do
-        local stat = stats[current]
-        if stat ~= nil then
-            if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
-                if stat.sellPrices.top1 ~= 0 then table.insert(dsSellTop1.values, { x = current, y = stat.sellPrices.top1 }) end
-                if stat.sellPrices.top10 ~= 0 then table.insert(dsSellTop10.values, { x = current, y = stat.sellPrices.top10 }) end
-                if stat.sellPrices.top50 ~= 0 then table.insert(dsSellTop50.values, { x = current, y = stat.sellPrices.top50 }) end
-            end
-            if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
-                if stat.buyPrices.top1 ~= 0 then table.insert(dsBuyTop1.values, { x = current, y = stat.buyPrices.top1 }) end
-                if stat.buyPrices.top10 ~= 0 then table.insert(dsBuyTop10.values, { x = current, y = stat.buyPrices.top10 }) end
-                if stat.buyPrices.top50 ~= 0 then table.insert(dsBuyTop50.values, { x = current, y = stat.buyPrices.top50 }) end
-            end
+    for i, stat in ipairs(stats) do
+        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
+            if stat.sellPrices.top1 ~= 0 then table.insert(dsSellTop1.values, { x = stat.time, y = stat.sellPrices.top1 }) end
+            if stat.sellPrices.top10 ~= 0 then table.insert(dsSellTop10.values, { x = stat.time, y = stat.sellPrices.top10 }) end
+            if stat.sellPrices.top50 ~= 0 then table.insert(dsSellTop50.values, { x = stat.time, y = stat.sellPrices.top50 }) end
         end
-        current = current + secondsInHour
+        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
+            if stat.buyPrices.top1 ~= 0 then table.insert(dsBuyTop1.values, { x = stat.time, y = stat.buyPrices.top1 }) end
+            if stat.buyPrices.top10 ~= 0 then table.insert(dsBuyTop10.values, { x = stat.time, y = stat.buyPrices.top10 }) end
+            if stat.buyPrices.top50 ~= 0 then table.insert(dsBuyTop50.values, { x = stat.time, y = stat.buyPrices.top50 }) end
+        end
     end
 
     self:EstimateProfits(stats[now])
@@ -660,9 +620,8 @@ function CommodityStats:GetValueBoundaries(t)
     local earliest = -1
     local minPrice = -1
     local maxPrice = -1
-    
-    for i, data in pairs(t) do
-    	local timestamp = tonumber(i)
+    for i, data in ipairs(t) do
+    	local timestamp = data.time
     	if timestamp ~= nil then
 	        if earliest == -1 or earliest > timestamp then
 	            earliest = timestamp
@@ -679,7 +638,9 @@ function CommodityStats:GetValueBoundaries(t)
 	            if data.buyPrices.top50 > maxPrice then maxPrice = data.buyPrices.top50 end
 	        end
 
-	        minPrice = maxPrice
+            if minPrice < 0 then
+	           minPrice = maxPrice
+            end
 
 	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
 	            if data.sellPrices.top1 < minPrice and data.sellPrices.top1 ~= 0 then minPrice = data.sellPrices.top1 end
@@ -697,54 +658,54 @@ function CommodityStats:GetValueBoundaries(t)
 end
 
 function CommodityStats:PurgeExpiredStats()
-    if self.settings.daysToKeep > 0 then
-        local counter = 0
-        local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
-        for index, item in pairs(self.statistics) do
-            if type(index) == 'number' or index == CREDDid then
-                for timestamp, stat in pairs(item) do
-                    if type(timestamp) == 'number' then
-                        if timestamp <= minimumTime then
-                            item[timestamp] = nil
-                            counter = counter + 1
-                        end
-                    end
-                end
-            end
-        end
-        if counter > 0 then
-            glog:debug("Removed " .. tostring(counter) .. " statistics that were older than " .. tostring(self.settings.daysToKeep) .. " days.")
-        end
-    end
+    -- if self.settings.daysToKeep > 0 then
+    --     local counter = 0
+    --     local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
+    --     for index, item in pairs(self.statistics) do
+    --         if type(index) == 'number' or index == CREDDid then
+    --             for timestamp, stat in pairs(item) do
+    --                 if type(timestamp) == 'number' then
+    --                     if timestamp <= minimumTime then
+    --                         item[timestamp] = nil
+    --                         counter = counter + 1
+    --                     end
+    --                 end
+    --             end
+    --         end
+    --     end
+    --     if counter > 0 then
+    --         glog:debug("Removed " .. tostring(counter) .. " statistics that were older than " .. tostring(self.settings.daysToKeep) .. " days.")
+    --     end
+    -- end
 end
 
 function CommodityStats:AverageStatistics()
 	if self.settings.daysUntilAverage > 0 and (os.time() - self.lastAverageRun) > secondsInDay then
-		local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
-		for itemid, stats in pairs(self.statistics) do 
-            if type(itemid) == 'number' then
-    			if stats.earliest == nil then
-    				local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
-    				stats.earliest = earliest
-    			end
-    			while stats.earliest < treshold do
-    				local firstStat = stats.earliest
-    				local newStats = {}
-    				while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
-    					local stat = stats[stats.earliest]
-    					if stat ~= nil then
-    						table.insert(newStats, stat)
-    						stats[stats.earliest] = nil
-    					end
-    					stats.earliest = stats.earliest + secondsInHour
-    				end
-                    if #newStats > 0 then
-                        stats[firstStat] = AverageStats(newStats)
-                    end
-    			end
-            end
-            self.lastAverageRun = os.time()
-		end
+		-- local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
+		-- for itemid, stats in pairs(self.statistics) do 
+  --           if type(itemid) == 'number' then
+  --   			if stats.earliest == nil then
+  --   				local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
+  --   				stats.earliest = earliest
+  --   			end
+  --   			while stats.earliest < treshold do
+  --   				local firstStat = stats.earliest
+  --   				local newStats = {}
+  --   				while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
+  --   					local stat = stats[stats.earliest]
+  --   					if stat ~= nil then
+  --   						table.insert(newStats, stat)
+  --   						stats[stats.earliest] = nil
+  --   					end
+  --   					stats.earliest = stats.earliest + secondsInHour
+  --   				end
+  --                   if #newStats > 0 then
+  --                       stats[firstStat] = AverageStats(newStats)
+  --                   end
+  --   			end
+  --           end
+  --           self.lastAverageRun = os.time()
+		-- end
 	end
 end
 
@@ -853,23 +814,6 @@ function AverageNumbers(tCollection)
         total = total + val
     end
     return math.floor(total / #tCollection)
-end
-
-function CommodityStats:CleanItemDatabase()
-    -- needed to clean zero values when I mess up
-    for id, stats in pairs(self.statistics) do
-        local highest = 0
-        for time, stat in pairs(stats) do
-            if stat.buyOrderCount == nil then stat.buyOrderCount = 0 end
-            if stat.sellOrderCount == nil then stat.sellOrderCount = 0 end
-            if stat.buyOrderCount > highest then highest = stat.buyOrderCount end
-            if stat.sellOrderCount > highest then highest = stat.sellOrderCount end
-        end
-        if highest == 0 then
-            glog:debug("Deleting item ID " .. tostring(id))
-            self.statistics[id] = nil
-        end
-    end
 end
 
 function DrawLine(wndTarget, height, color)
@@ -1099,7 +1043,7 @@ end
 function CommodityStats:OnConfigure(sCommand, sArgs)
     if sArgs ~= nil then
         if sArgs:lower() == "rover" then
-            Event_FireGenericEvent("SendVarToRover", "Commodity Prices", self.statistics)
+            Event_FireGenericEvent("SendVarToRover", "Commodity Prices", self.stats.d)
             Event_FireGenericEvent("SendVarToRover", "Commodity Transactions", self.transactions)
             glog:info("Sent statistics to Rover")
             return
@@ -1114,6 +1058,15 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
         end
         if sArgs:lower() == "log" then
             self:DisplayTransactions()
+            return
+        end
+        if sArgs:lower() == "convert" then
+            glog:info("converting statistics")
+            for itemid, stats in pairs(self.statistics) do
+                for timestamp, stat in pairs(stats) do
+                    self.stats:SaveStat(itemid, stat)
+                end
+            end
             return
         end
     end
@@ -1468,22 +1421,22 @@ end
 
 function CommodityStats:OnDeleteSinglePricePoint( wndHandler, wndControl, eMouseButton )
     local tData = wndControl:GetParent():GetData()
-    local prices = self.statistics[self.currentItemID][tData.x]
+    local prices = self.stats:GetStatByItemIdAndTimestamp(self.currentItemID, tData.x)
+    Print(tData.x)
     if prices.buyPrices.top1 == tData.y then prices.buyPrices.top1 = 0 end
     if prices.buyPrices.top10 == tData.y then prices.buyPrices.top10 = 0 end
     if prices.buyPrices.top50 == tData.y then prices.buyPrices.top50 = 0 end
     if prices.sellPrices.top1 == tData.y then prices.sellPrices.top1 = 0 end
     if prices.sellPrices.top10 == tData.y then prices.sellPrices.top10 = 0 end
     if prices.sellPrices.top50 == tData.y then prices.sellPrices.top50 = 0 end
-    
-    self.statistics[self.currentItemID][tData.x] = priceSubtitle
+    self.stats:UpdateStatistics(self.currentItemID, tData.x, prices)
     self.wndDataPoint:Show(false)
     self:LoadStatisticsForm()
 end
 
 function CommodityStats:OnDeleteFullPricePoint( wndHandler, wndControl, eMouseButton )
     local tData = wndControl:GetParent():GetData()
-    self.statistics[self.currentItemID][tData.x] = nil
+    self.stats:RemoveTimestamp(self.currentItemID, tData.x)
 
     self.wndDataPoint:Show(false)
     self:LoadStatisticsForm()
