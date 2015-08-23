@@ -54,13 +54,16 @@ function Statistics.Init()
 	end
 
 	function self:UpdateStatistics(itemid, timestamp, updateditem)
-		local line = trim(string.match(self.d[itemid].data, tostring(timestamp) .. Pattern.ByTimestamp))
-		string.gsub(self.d[itemid].data, line, statToString(updateditem))
+		if updateditem.buyPrices.top1 == 0 and updateditem.buyPrices.top10 == 0 and updateditem.buyPrices.top50 == 0 and 
+			updateditem.sellPrices.top1 == 0 and updateditem.sellPrices.top10 == 0 and updateditem.sellPrices.top50 == 0 then
+			self:RemoveTimestamp(itemid, timestamp)
+		else
+			self.d[itemid].data = string.gsub(self.d[itemid].data, tostring(timestamp) .. Pattern.ByTimestamp, statToString(updateditem))
+		end
 	end
 
 	function self:RemoveTimestamp(itemid, timestamp)
-		local line = trim(string.match(self.d[itemid].data, tostring(timestamp) .. Pattern.ByTimestamp))
-		string.gsub(self.d[itemid].data, line, "")
+		self.d[itemid].data = string.gsub(self.d[itemid].data, tostring(timestamp) .. Pattern.ByTimestamp, "")
 	end
 
 	function self:SaveStat(itemid, stat)
@@ -111,7 +114,6 @@ function Statistics.Init()
 		stat.sellPrices.top1 = tonumber(t[7])
 		stat.sellPrices.top10 = tonumber(t[8])
 		stat.sellPrices.top50 = tonumber(t[9])
-
 		return stat
 	end
 

@@ -654,6 +654,11 @@ function CommodityStats:GetValueBoundaries(t)
 	        end
 	    end
     end
+
+    if minPrice == maxPrice then -- this rare case happens when prices never changed. Give a little room to display the flat line
+        minPrice = minPrice - 5
+        maxPrice = maxPrice + 5
+    end
     return earliest, minPrice, maxPrice
 end
 
@@ -1034,6 +1039,18 @@ end
 
 function trim(s)
     return s:find'^%s*$' and '' or s:match'^%s*(.*%S)'
+end
+
+function table.copy(t)
+  local t2 = {};
+  for k,v in pairs(t) do
+    if type(v) == "table" then
+        t2[k] = table.copy(v);
+    else
+        t2[k] = v;
+    end
+  end
+  return t2;
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1422,7 +1439,6 @@ end
 function CommodityStats:OnDeleteSinglePricePoint( wndHandler, wndControl, eMouseButton )
     local tData = wndControl:GetParent():GetData()
     local prices = self.stats:GetStatByItemIdAndTimestamp(self.currentItemID, tData.x)
-    Print(tData.x)
     if prices.buyPrices.top1 == tData.y then prices.buyPrices.top1 = 0 end
     if prices.buyPrices.top10 == tData.y then prices.buyPrices.top10 = 0 end
     if prices.buyPrices.top50 == tData.y then prices.buyPrices.top50 = 0 end
