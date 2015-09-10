@@ -9,7 +9,8 @@ function Statistics.Init()
 	local Pattern = {
 		AllStats = "[^\n]+",
 		LatestStat = "[%a%d\;]+\n$",
-		ByTimestamp = "[%a%d\;]+\n"
+		ByTimestamp = "[%a%d\;]+\n",
+		StringToStat = "[^;]+"
 	}
 
 	function self:LoadData(_data)
@@ -22,7 +23,8 @@ function Statistics.Init()
 			local lines = string.gmatch(self.d[itemid].data, Pattern.AllStats)
 
 			for line in lines do
-				table.insert(stats, stringToStat(line))
+				local stat = stringToStat(line)
+				stats[stat.time] = stat
 			end
 		end
 		return stats
@@ -84,22 +86,22 @@ function Statistics.Init()
 	function statToString(stat)
 		-- concat with '..'  is very slow in lua due to immutable strings. Using a table is the recommended way for large volumes
 		local t = {}
-		t[1] = stat.time
-		t[2] = stat.buyOrderCount
-		t[3] = stat.sellOrderCount
-		t[4] = stat.buyPrices.top1
-		t[5] = stat.buyPrices.top10
-		t[6] = stat.buyPrices.top50
-		t[7] = stat.sellPrices.top1
-		t[8] = stat.sellPrices.top10
-		t[9] = stat.sellPrices.top50
+		t[1] = stat.time or ""
+		t[2] = stat.buyOrderCount or 0
+		t[3] = stat.sellOrderCount or 0
+		t[4] = stat.buyPrices.top1 or 0
+		t[5] = stat.buyPrices.top10 or 0
+		t[6] = stat.buyPrices.top50 or 0
+		t[7] = stat.sellPrices.top1 or 0
+		t[8] = stat.sellPrices.top10 or 0
+		t[9] = stat.sellPrices.top50 or 0
 		t[10] = '\n'
 
 		return table.concat(t, ";")
 	end
 
 	function stringToStat(input)
-		local t = iteratorToArray(string.gmatch(input, "[^;]+"))
+		local t = iteratorToArray(string.gmatch(input, Pattern.StringToStat))
 		local stat = {
 			buyPrices = {},
 			sellPrices = {}
