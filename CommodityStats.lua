@@ -115,6 +115,7 @@ local clrBuyTop50 = {a=1,r=0.8,g=1,b=0.8}
 local CREDDid = "999999"
 local transactionListItems = {}
 local jobList = {}
+local jobFullSize = 0
 local jobRunning = false
 
  
@@ -140,6 +141,8 @@ function CommodityStats:OnInitialize()
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
+
+    self.SupplySatchel = Apollo.GetAddon("SupplySatchel")
 
     self.messageTimer = ApolloTimer.Create(3, true, "OnClearMessageTimer", self)
     self.messageTimer:Stop()
@@ -335,18 +338,21 @@ function CommodityStats:OnRunJob()
         jobRunning = true
 
         local job = jobList[1]
-        local itemid = job.data
 
         if job.type == CommodityStats.JobType.CONVERT  then
+            local itemid = job.data
             for timestamp, item in pairs(self.statistics[itemid]) do
                 if type(timestamp) == 'number' then
                     item.time = timestamp
                     self.stats:SaveStat(itemid, item)
                 end
             end
-            table.remove(jobList, timestamp)
+            table.remove(jobList, 1)
 
-            Event_FireGenericEvent("ReportProgress", "Converting data", #jobList)
+            local progress = (jobFullSize - #jobList) / jobFullSize
+            local message = "Converting data for itemid " .. tostring(itemid)
+            Event_FireGenericEvent("ReportProgress", message, progress, true)
+
             if #jobList == 0 then
                  Event_FireGenericEvent("JobFinished", job.type)
             end
@@ -355,8 +361,8 @@ function CommodityStats:OnRunJob()
     end
 end
 
-function CommodityStats:OnProgressReported(message, queuesize)
-    Print(message .. " (" .. tostring(queuesize) .. " remaining)")
+function CommodityStats:OnProgressReported(message, progress, showwindow)
+    Print(message .. " (" .. round(progress * 100, 2) .. "%)")
 end
 
 function CommodityStats:OnJobFinished(jobtype)
@@ -592,9 +598,9 @@ function CommodityStats:LoadStatisticsForm()
 
 
     if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
-        self.plot:AddDataSet(dsSellTop1)
-        self.plot:AddDataSet(dsSellTop10)
         self.plot:AddDataSet(dsSellTop50)
+        self.plot:AddDataSet(dsSellTop10)
+        self.plot:AddDataSet(dsSellTop1)
     end
     if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
         self.plot:AddDataSet(dsBuyTop1)
@@ -1107,6 +1113,11 @@ function table.copy(t)
   return t2;
 end
 
+function round(input, decimals)
+    -- note that we are returning a string here. This is because we currently only use this to print percentages. We'd needlessly convert tonumber and back tostring
+    return string.format("%." .. (decimals or 0) .. "f", input)
+end
+
 ---------------------------------------------------------------------------------------------------
 -- Button Functions
 ---------------------------------------------------------------------------------------------------
@@ -1138,6 +1149,7 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
                     table.insert(jobList, { type = CommodityStats.JobType.CONVERT, data = itemid })
                 end
             end
+            jobFullSize = #jobList
             self.processingTimer:Start()
             return
         end
