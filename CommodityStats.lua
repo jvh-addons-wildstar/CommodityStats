@@ -107,11 +107,11 @@ CommodityStats.settings = {
 local secondsInDay = 86400
 local secondsInHour = 3600
 local clrSellTop1 = {a=1,r=1,g=0,b=0}
-local clrSellTop10 = {a=1,r=1,g=0.5,b=0.5}
-local clrSellTop50 = {a=1,r=1,g=0.8,b=0.8}
+local clrSellTop10 = {a=1,r=0.8,g=0,b=0}
+local clrSellTop50 = {a=1,r=0.5,g=0,b=0}
 local clrBuyTop1 = {a=1,r=0,g=1,b=0}
-local clrBuyTop10 = {a=1,r=0.5,g=1,b=0.5}
-local clrBuyTop50 = {a=1,r=0.8,g=1,b=0.8}
+local clrBuyTop10 = {a=1,r=0,g=0.8,b=0}
+local clrBuyTop50 = {a=1,r=0,g=0.5,b=0}
 local CREDDid = "999999"
 local transactionListItems = {}
 local jobList = {}
@@ -339,7 +339,7 @@ function CommodityStats:OnRunJob()
 
         local job = jobList[1]
 
-        if job.type == CommodityStats.JobType.CONVERT  then
+        if job.type == CommodityStats.JobType.CONVERT then
             local itemid = job.data
             for timestamp, item in pairs(self.statistics[itemid]) do
                 if type(timestamp) == 'number' then
@@ -350,27 +350,47 @@ function CommodityStats:OnRunJob()
             table.remove(jobList, 1)
 
             local progress = (jobFullSize - #jobList) / jobFullSize
-            local message = "Converting data for itemid " .. tostring(itemid)
+            local message = "Converting CommodityStats data to new format, please wait..."
             Event_FireGenericEvent("ReportProgress", message, progress, true)
-
-            if #jobList == 0 then
-                 Event_FireGenericEvent("JobFinished", job.type)
-            end
+        end
+        if #jobList == 0 then
+             Event_FireGenericEvent("JobFinished", job.type)
         end
         jobRunning = false
+    else
+        self.processingTimer:Stop()
     end
 end
 
 function CommodityStats:OnProgressReported(message, progress, showwindow)
-    Print(message .. " (" .. round(progress * 100, 2) .. "%)")
+    if showwindow then
+        self:UpdateProgressWindow(message, progress)
+    else
+        glog:debug(message .. " (" .. round(progress * 100, 2) .. "%)")
+    end
 end
 
 function CommodityStats:OnJobFinished(jobtype)
-    self.processingTimer:Stop()
-
     if jobtype == CommodityStats.JobType.CONVERT then
-        Print("Job finished")
+        if self.wndProgress ~= nil then
+            self.wndProgress:Destroy()
+            self.wndProgress = nil
+        end
+        self.processingTimer:Stop()
+        Print("CommodityStats has updated it's data to a new format. We STRONGLY recommend you reload your interface with the /reloadui command.")
     end
+
+end
+
+function CommodityStats:UpdateProgressWindow(text, progress)
+    if self.wndProgress == nil then
+        self.wndProgress = Apollo.LoadForm(self.Xml, "ProgressDialog", nil, self)
+        self.wndProgress:Invoke()
+    end
+    local progressText = round(progress * 100, 2) .. "%"
+    self.wndProgress:FindChild("txtMessage"):SetText(text)
+    self.wndProgress:FindChild("ProgressBar"):SetProgress(progress)
+    self.wndProgress:FindChild("ProgressBar"):SetText(progressText)
 end
 
 function CommodityStats:OnListSubmitBtn( wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY )
@@ -481,6 +501,18 @@ function CommodityStats:OnRestore(eLevel, tData)
     self.stats:LoadData(tData.stats or {})
     if tData.settings ~= nil then
         self.settings = tData.settings
+
+        if self.statistics ~= nil then
+            glog:info("converting statistics")
+            for itemid, stats in pairs(self.statistics) do
+                if type(itemid) == 'number' or index == CREDDid then
+                    table.insert(jobList, { type = CommodityStats.JobType.CONVERT, data = itemid })
+                end
+            end
+            jobFullSize = #jobList
+            self.processingTimer:Start()
+            return
+        end
         self:PurgeExpiredStats()
         self:AverageStatistics()
     end
@@ -1153,9 +1185,10 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
             self.processingTimer:Start()
             return
         end
+    else
+        self.wndMain:Show(true)
+        self:OnTabSelected(nil, nil, nil, true)
     end
-    self.wndMain:Show(true)
-    self:OnTabSelected(nil, nil, nil, true)
 end
 
 function CommodityStats:OnSettingsSave(wndHandler, wndControl, eMouseButton)
