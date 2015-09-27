@@ -46,6 +46,10 @@ L["Match the top buy price"] = "Égaler le meilleur prix d'achat" -- increase pr
 L["Increase by percentage"] = "Augmentation par pourcentage" -- increase price radio menu
 L["Increase by fixed amount"] = "Augmentation par montant fixe" -- increase price radio menu
 L["Price History"] = "Historique des prix" -- title header
+L["Price Graph"] = "Graphique des prix"
+L["Graph style"] = "Style de graphique"
+L["Line chart"] = true
+L["Area chart"] = true
 L["How long do we keep the price history? (0 = forever)"] = "Combien de temps conserver l'historique des prix ? (0 = toujours)"
 L["How long until we average hourly to daily statistics? (0 = never)"] = "Combien de temps avant d'aplanir la moyenne horaire en moyenne quotidienne ? (0 = jamais)"
 L["days"] = "jours" -- literal translation

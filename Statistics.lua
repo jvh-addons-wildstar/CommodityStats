@@ -26,6 +26,7 @@ function Statistics.Init()
 				local stat = stringToStat(line)
 				stats[stat.time] = stat
 			end
+			stats.earliest = self.d[itemid].earliest
 		end
 		return stats
 	end
@@ -68,7 +69,7 @@ function Statistics.Init()
 		self.d[itemid].data = string.gsub(self.d[itemid].data, tostring(timestamp) .. Pattern.ByTimestamp, "")
 	end
 
-	function self:SaveStat(itemid, stat)
+	function self:SaveStat(itemid, stat, prepend)
 		if self.d ~= nil then
 			if self.d[itemid] == nil then
 				self.d[itemid] = {}
@@ -77,9 +78,12 @@ function Statistics.Init()
 			-- make sure we don't have stats for this timestamp yet
 			local existing = self:GetStatByItemIdAndTimestamp(itemid, stat.time)
 			if existing == nil then
-				self.d[itemid].data = self.d[itemid].data .. statToString(stat)
+				if prepend ~= true then
+					self.d[itemid].data = self.d[itemid].data .. statToString(stat)
+				else
+					self.d[itemid].data = statToString(stat) .. self.d[itemid].data
+				end
 			end
-
 		end
 	end
 

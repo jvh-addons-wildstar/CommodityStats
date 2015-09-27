@@ -45,6 +45,10 @@ L["Match the top buy price"] = true
 L["Increase by percentage"] = true
 L["Increase by fixed amount"] = true
 L["Price History"] = true
+L["Price Graph"] = true
+L["Graph style"] = true
+L["Line chart"] = true
+L["Area chart"] = true
 L["How long do we keep the price history? (0 = forever)"] = true
 L["How long until we average hourly to daily statistics? (0 = never)"] = true
 L["days"] = true

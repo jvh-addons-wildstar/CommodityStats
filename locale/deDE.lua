@@ -46,6 +46,10 @@ L["Match the top buy price"] = "Anpassen an den höchsten Kaufpreis"
 L["Increase by percentage"] = "Erhöhung durch Prozente"
 L["Increase by fixed amount"] = "Erhöhung durch Festbetrag"
 L["Price History"] = "Preisentwicklung"
+L["Price Graph"] = "Preis Diagramm"
+L["Graph style"] = "Grafikstil"
+L["Line chart"] = true
+L["Area chart"] = true
 L["How long do we keep the price history? (0 = forever)"] = "Wie lange soll die Preisentwicklung erhalten bleiben? (0 = immer)"
 L["How long until we average hourly to daily statistics? (0 = never)"] = "Ab wann sollen stündliche zu täglichen Durchschnitsstatikstiken umgewandelt werden? (0 = nie)"
 L["days"] = "Tage"

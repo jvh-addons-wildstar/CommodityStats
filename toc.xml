@@ -11,6 +11,7 @@
     <Script Name="locale\frFR.lua"/>
     <Script Name="PluginManager.lua"/>
     <Script Name="Statistics.lua"/>
+    <Script Name="Transactions.lua"/>
     <Script Name="CommodityStats.lua"/>
     <Form Name="CommodityStats.xml"/>
 </Addon>

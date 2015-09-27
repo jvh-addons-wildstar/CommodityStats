@@ -53,7 +53,10 @@ CommodityStats.Strategy = {
 }
 
 CommodityStats.JobType = {
-    CONVERT = 0
+    CONVERTSTATISTICS = 0,
+    CONVERTTRANSACTIONS = 1,
+    PURGEEXPIRED = 2,
+    AVERAGESTATS = 3,
 }
 
 -- Price groups
@@ -121,6 +124,7 @@ local jobRunning = false
  
 -- OnIntialize replaces OnLoad with GeminiAddon
 function CommodityStats:OnInitialize()
+    self:OnWindowManagementReady()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
@@ -134,10 +138,12 @@ function CommodityStats:OnInitialize()
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
+    Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "CommodityStats_Main"})
     GeminiLocale:TranslateWindow(L, self.wndMain)
 
     self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage.Init(self)
     self.stats = Apollo.GetPackage("CommodityStats:Statistics").tPackage.Init()
+    self.trans = Apollo.GetPackage("CommodityStats:Transactions").tPackage.Init()
 
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
@@ -338,8 +344,9 @@ function CommodityStats:OnRunJob()
         jobRunning = true
 
         local job = jobList[1]
+        local message = "CommodityStats is optimizing data, please wait..."
 
-        if job.type == CommodityStats.JobType.CONVERT then
+        if job.type == CommodityStats.JobType.CONVERTSTATISTICS then
             local itemid = job.data
             for timestamp, item in pairs(self.statistics[itemid]) do
                 if type(timestamp) == 'number' then
@@ -347,12 +354,59 @@ function CommodityStats:OnRunJob()
                     self.stats:SaveStat(itemid, item)
                 end
             end
-            table.remove(jobList, 1)
-
-            local progress = (jobFullSize - #jobList) / jobFullSize
-            local message = "Converting CommodityStats data to new format, please wait..."
-            Event_FireGenericEvent("ReportProgress", message, progress, true)
         end
+
+        if job.type == CommodityStats.JobType.CONVERTTRANSACTIONS then
+            local itemid = job.data
+            for timestamp, item in pairs(self.transactions[itemid]) do
+                if type(timestamp) == 'number' then
+                    item.time = timestamp
+                    self.trans:SaveTransaction(itemid, item)
+                end
+            end
+        end
+
+        if job.type == CommodityStats.JobType.PURGEEXPIRED then
+            local itemid = job.data
+            local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
+            local timestamps = self.stats:GetAllStatsForItemId(itemid)
+            for timestamp, stat in pairs(timestamps) do
+                if timestamp <= minimumTime then
+                    self.stats:RemoveTimestamp(itemid, timestamp)
+                end
+            end
+        end
+
+        if job.type == CommodityStats.JobType.AVERAGESTATS then
+            local itemid = job.data
+            local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
+            local stats = self.stats:GetAllStatsForItemId(itemid)
+            if stats.earliest == nil then
+                local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
+                stats.earliest = earliest
+            end
+            while stats.earliest < treshold do
+                local firstStat = stats.earliest
+                local newStats = {}
+                while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
+                    local stat = self.stats:GetStatByItemIdAndTimestamp(itemid, stats.earliest)
+                    if stat ~= nil then
+                        table.insert(newStats, stat)
+                        self.stats:RemoveTimestamp(itemid, stats.earliest)
+                    end
+                    stats.earliest = stats.earliest + secondsInHour
+                end
+                if #newStats > 0 then
+                    self.stats.d[itemid].earliest = stats.earliest
+                    self.stats:SaveStat(itemid, AverageStats(newStats), true)
+                end
+            end
+        end
+
+        table.remove(jobList, 1)
+        local progress = (jobFullSize - #jobList) / jobFullSize
+        Event_FireGenericEvent("ReportProgress", message, progress, true)
+
         if #jobList == 0 then
              Event_FireGenericEvent("JobFinished", job.type)
         end
@@ -371,12 +425,12 @@ function CommodityStats:OnProgressReported(message, progress, showwindow)
 end
 
 function CommodityStats:OnJobFinished(jobtype)
-    if jobtype == CommodityStats.JobType.CONVERT then
-        if self.wndProgress ~= nil then
-            self.wndProgress:Destroy()
-            self.wndProgress = nil
-        end
-        self.processingTimer:Stop()
+    if self.wndProgress ~= nil then
+        self.wndProgress:Destroy()
+        self.wndProgress = nil
+    end
+    self.processingTimer:Stop()
+    if jobtype == CommodityStats.JobType.CONVERTSTATISTICS or jobtype == CommodityStats.JobType.CONVERTTRANSACTIONS then
         Print("CommodityStats has updated it's data to a new format. We STRONGLY recommend you reload your interface with the /reloadui command.")
     end
 
@@ -477,7 +531,7 @@ function CommodityStats:CreateCommodityStat(tStats)
 end
 
 function CommodityStats:OnWindowManagementReady()
-    Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "CommodityStats_Main"})
+    Event_FireGenericEvent("WindowManagementRegister", {strName = CommodityStats_Main, nSaveVersion=3})
 end
 
 function CommodityStats:OnSave(eLevel)
@@ -487,7 +541,7 @@ function CommodityStats:OnSave(eLevel)
 
     local save = {
         stats = self.stats.d,
-        transactions = self.transactions,
+        trans = self.trans.d,
         settings = self.settings,
         lastAverageRun = self.lastAverageRun
     }
@@ -497,8 +551,10 @@ end
 function CommodityStats:OnRestore(eLevel, tData)
     self.transactions = tData.transactions or {}
     self.lastAverageRun = tData.lastAverageRun or 0
-    self.statistics = tData.statistics or {}
+    self.statistics = tData.statistics or nil
     self.stats:LoadData(tData.stats or {})
+    self.trans:LoadData(tData.trans or {})
+    -- convert old format data to new format
     if tData.settings ~= nil then
         self.settings = tData.settings
 
@@ -506,15 +562,23 @@ function CommodityStats:OnRestore(eLevel, tData)
             glog:info("converting statistics")
             for itemid, stats in pairs(self.statistics) do
                 if type(itemid) == 'number' or index == CREDDid then
-                    table.insert(jobList, { type = CommodityStats.JobType.CONVERT, data = itemid })
+                    table.insert(jobList, { type = CommodityStats.JobType.CONVERTSTATISTICS, data = itemid })
+                end
+            end
+            for itemid, transactions in pairs(self.transactions) do
+                if type(itemid) == 'number' or index == CREDDid then
+                    table.insert(jobList, { type = CommodityStats.JobType.CONVERTTRANSACTIONS, data = itemid })
                 end
             end
             jobFullSize = #jobList
             self.processingTimer:Start()
             return
+        else
+            self:PurgeExpiredStats()
+            --self:AverageStatistics()
+            jobFullSize = #jobList
+            self.processingTimer:Start()
         end
-        self:PurgeExpiredStats()
-        self:AverageStatistics()
     end
 end
 
@@ -593,6 +657,7 @@ function CommodityStats:LoadStatisticsForm()
     self.plot:SetXInterval(3600)
 
     self.plot:SetOption("ePlotStyle", PixiePlot.SCATTER)
+    self.plot:SetOption("eFillStyle", self.settings.fillStyle or PixiePlot.LINEONLY)
     self.plot:SetOption("eCoordinateSystem", PixiePlot.CARTESIAN)
     self.plot:SetOption("bScatterLine", true)
     self.plot:SetOption("fLineWidth", 2)
@@ -713,38 +778,40 @@ function CommodityStats:GetValueBoundaries(t)
     local minPrice = -1
     local maxPrice = -1
     for i, data in pairs(t) do
-    	local timestamp = data.time
-    	if timestamp ~= nil then
-	        if earliest == -1 or earliest > timestamp then
-	            earliest = timestamp
-	        end
+        if type(i) == 'number' then
+        	local timestamp = data.time
+        	if timestamp ~= nil then
+    	        if earliest == -1 or earliest > timestamp then
+    	            earliest = timestamp
+    	        end
 
-	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
-	            if data.sellPrices.top1 > maxPrice then maxPrice = data.sellPrices.top1 end
-	            if data.sellPrices.top10 > maxPrice then maxPrice = data.sellPrices.top10 end
-	            if data.sellPrices.top50 > maxPrice then maxPrice = data.sellPrices.top50 end
-	        end
-	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
-	            if data.buyPrices.top1 > maxPrice then maxPrice = data.buyPrices.top1 end
-	            if data.buyPrices.top10 > maxPrice then maxPrice = data.buyPrices.top10 end
-	            if data.buyPrices.top50 > maxPrice then maxPrice = data.buyPrices.top50 end
-	        end
+    	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
+    	            if data.sellPrices.top1 > maxPrice then maxPrice = data.sellPrices.top1 end
+    	            if data.sellPrices.top10 > maxPrice then maxPrice = data.sellPrices.top10 end
+    	            if data.sellPrices.top50 > maxPrice then maxPrice = data.sellPrices.top50 end
+    	        end
+    	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
+    	            if data.buyPrices.top1 > maxPrice then maxPrice = data.buyPrices.top1 end
+    	            if data.buyPrices.top10 > maxPrice then maxPrice = data.buyPrices.top10 end
+    	            if data.buyPrices.top50 > maxPrice then maxPrice = data.buyPrices.top50 end
+    	        end
 
-            if minPrice < 0 then
-	           minPrice = maxPrice
-            end
+                if minPrice < 0 then
+    	           minPrice = maxPrice
+                end
 
-	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
-	            if data.sellPrices.top1 < minPrice and data.sellPrices.top1 ~= 0 then minPrice = data.sellPrices.top1 end
-	            if data.sellPrices.top10 < minPrice and data.sellPrices.top10 ~= 0 then minPrice = data.sellPrices.top10 end
-	            if data.sellPrices.top50 < minPrice and data.sellPrices.top50 ~= 0 then minPrice = data.sellPrices.top50 end
-	        end
-	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
-	            if data.buyPrices.top1 < minPrice and data.buyPrices.top1 ~= 0 then minPrice = data.buyPrices.top1 end
-	            if data.buyPrices.top10 < minPrice and data.buyPrices.top10 ~= 0 then minPrice = data.buyPrices.top10 end
-	            if data.buyPrices.top50 < minPrice and data.buyPrices.top50 ~= 0 then minPrice = data.buyPrices.top50 end
-	        end
-	    end
+    	        if self.settings.orderType == CommodityStats.OrderType.SELL or self.settings.orderType == CommodityStats.OrderType.BOTH then
+    	            if data.sellPrices.top1 < minPrice and data.sellPrices.top1 ~= 0 then minPrice = data.sellPrices.top1 end
+    	            if data.sellPrices.top10 < minPrice and data.sellPrices.top10 ~= 0 then minPrice = data.sellPrices.top10 end
+    	            if data.sellPrices.top50 < minPrice and data.sellPrices.top50 ~= 0 then minPrice = data.sellPrices.top50 end
+    	        end
+    	        if self.settings.orderType == CommodityStats.OrderType.BUY or self.settings.orderType == CommodityStats.OrderType.BOTH then
+    	            if data.buyPrices.top1 < minPrice and data.buyPrices.top1 ~= 0 then minPrice = data.buyPrices.top1 end
+    	            if data.buyPrices.top10 < minPrice and data.buyPrices.top10 ~= 0 then minPrice = data.buyPrices.top10 end
+    	            if data.buyPrices.top50 < minPrice and data.buyPrices.top50 ~= 0 then minPrice = data.buyPrices.top50 end
+    	        end
+    	    end
+        end
     end
 
     if minPrice == maxPrice then -- this rare case happens when prices never changed. Give a little room to display the flat line
@@ -756,50 +823,19 @@ end
 
 function CommodityStats:PurgeExpiredStats()
     if self.settings.daysToKeep > 0 then
-        local counter = 0
-        local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
         for itemid, item in pairs(self.stats.d) do
             if type(itemid) == 'number' or index == CREDDid then
-                local timestamps = self.stats:GetAllStatsForItemId(itemid)
-                for index, stat in ipairs(timestamps) do
-                    if stat.time <= minimumTime then
-                        self.stats:RemoveTimestamp(itemid, stat.time)
-                        counter = counter + 1
-                    end
-                end
+                table.insert(jobList, { type = CommodityStats.JobType.PURGEEXPIRED, data = itemid })
             end
-        end
-        if counter > 0 then
-            glog:debug("Removed " .. tostring(counter) .. " statistics that were older than " .. tostring(self.settings.daysToKeep) .. " days.")
         end
     end
 end
 
 function CommodityStats:AverageStatistics()
 	if self.settings.daysUntilAverage > 0 and (os.time() - self.lastAverageRun) > secondsInDay then
-		local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
 		for itemid, stats in pairs(self.stats.d) do 
-            if type(itemid) == 'number' then
-                local statistics = self.stats:GetAllStatsForItemId(itemid)
-    			if stats.earliest == nil then
-    				local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
-    				stats.earliest = earliest
-    			end
-    			while stats.earliest < treshold do
-    				local firstStat = stats.earliest
-    				local newStats = {}
-    				while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
-    					local stat = self.stats:GetStatByItemIdAndTimestamp(itemid, stats.earliest)
-    					if stat ~= nil then
-    						table.insert(newStats, stat)
-    						self.stats:RemoveTimestamp(itemid, stats.earliest)
-    					end
-    					stats.earliest = stats.earliest + secondsInHour
-    				end
-                    if #newStats > 0 then
-                        self.stats:SaveStat(itemid, AverageStats(newStats))
-                    end
-    			end
+            if type(itemid) == 'number' or index == CREDDid then
+                table.insert(jobList, { type = CommodityStats.JobType.AVERAGESTATS, data = itemid })
             end
             self.lastAverageRun = os.time()
 		end
@@ -835,6 +871,15 @@ function CommodityStats:LoadConfigForm()
     else
         self.wndConfig:FindChild("chkCustom"):SetCheck(true)
         self.wndConfig:FindChild("CustomDateTimeContainer"):Show(true)
+    end
+
+    -- graph settings
+    local graphStyle = self.settings.fillStyle or PixiePlot.LINEONLY
+    if graphStyle == PixiePlot.LINEONLY then
+        self.wndConfig:FindChild("rboLineChart"):SetCheck(true)
+    end
+    if graphStyle == PixiePlot.FILL then
+        self.wndConfig:FindChild("rboAreaChart"):SetCheck(true)
     end
 
     -- sellorder pricing
@@ -954,8 +999,7 @@ function CommodityStats:OnItemRemoved(itemSold, nCount, eReason) -- called when 
         transaction.result = CommodityStats.Result.SELLSUCCESS
 
         local itemId = itemSold:GetItemId()
-        if self.transactions[itemId] == nil then self.transactions[itemId] = {} end
-        table.insert(self.transactions[itemId], transaction)
+        self.trans:SaveTransaction(itemId, transaction)
     end
 end
 
@@ -977,8 +1021,7 @@ function CommodityStats:OnMailboxOpen()
                     itemID, transaction = self:ProcessTransaction(info, CommodityStats.Result.SELLEXPIRED)
                 end
                 if transaction ~= nil and itemID ~= nil then
-                    if self.transactions[itemID] == nil then self.transactions[itemID] = {} end
-                    table.insert(self.transactions[itemID], transaction)
+                    self.trans:SaveTransaction(itemID, transaction)
                 end
                 mail:MarkAsRead()
             end
@@ -998,24 +1041,22 @@ function CommodityStats:DisplayTransactions(itemID)
 
     local wndItems = self.wndTransactions:FindChild("ItemList")
     if itemID == nil then
-        for id, transactions in pairs(self.transactions) do
-            for i, transaction in ipairs(self.transactions[id]) do
-                table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
-            end
-        end
+        -- for id, transactions in self.trans:GetAllTransactionsForItemId() do
+        --     for i, transaction in ipairs(self.transactions[id]) do
+        --         table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
+        --     end
+        -- end
     else
-        if self.transactions[itemID] ~= nil then
-            for i, transaction in ipairs(self.transactions[itemID]) do
-                if transaction.result == CommodityStats.Result.BUYSUCCESS then 
-                    buyQuantity = buyQuantity + transaction.quantity
-                    buyTotal = buyTotal + (transaction.quantity * transaction.price)
-                end
-                if transaction.result == CommodityStats.Result.SELLSUCCESS then
-                    sellQuantity = sellQuantity + transaction.quantity
-                    sellTotal = sellTotal + (transaction.quantity * transaction.price)
-                end
-                table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
+        for i, transaction in pairs(self.trans:GetAllTransactionsForItemId(itemID)) do
+            if transaction.result == CommodityStats.Result.BUYSUCCESS then 
+                buyQuantity = buyQuantity + transaction.quantity
+                buyTotal = buyTotal + (transaction.quantity * transaction.price)
             end
+            if transaction.result == CommodityStats.Result.SELLSUCCESS then
+                sellQuantity = sellQuantity + transaction.quantity
+                sellTotal = sellTotal + (transaction.quantity * transaction.price)
+            end
+            table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
         end
     end
     self.wndTransactions:FindChild("txtTotalBuyAmount"):SetText(tostring(buyQuantity))
@@ -1158,7 +1199,7 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
     if sArgs ~= nil then
         if sArgs:lower() == "rover" then
             Event_FireGenericEvent("SendVarToRover", "Commodity Prices", self.stats.d)
-            Event_FireGenericEvent("SendVarToRover", "Commodity Transactions", self.transactions)
+            Event_FireGenericEvent("SendVarToRover", "Commodity Transactions", self.trans.d)
             glog:info("Sent statistics to Rover")
             return
         end
@@ -1178,17 +1219,16 @@ function CommodityStats:OnConfigure(sCommand, sArgs)
             glog:info("converting statistics")
             for itemid, stats in pairs(self.statistics) do
                 if type(itemid) == 'number' or index == CREDDid then
-                    table.insert(jobList, { type = CommodityStats.JobType.CONVERT, data = itemid })
+                    table.insert(jobList, { type = CommodityStats.JobType.CONVERTSTATISTICS, data = itemid })
                 end
             end
             jobFullSize = #jobList
             self.processingTimer:Start()
             return
         end
-    else
-        self.wndMain:Show(true)
-        self:OnTabSelected(nil, nil, nil, true)
     end
+    self.wndMain:Show(true)
+    self:OnTabSelected(nil, nil, nil, true)
 end
 
 function CommodityStats:OnSettingsSave(wndHandler, wndControl, eMouseButton)
@@ -1315,7 +1355,7 @@ end
 function CommodityStats:OnConfirmTransactionReset( wndHandler, wndControl, eMouseButton )
 	local response = wndControl:GetText()
 	if response == "Yes" then
-		self.transactions[self.currentItemID] = {}
+		self.trans.d = {}
         self:LoadTransactionsForm()
 	end
 	
@@ -1524,6 +1564,16 @@ end
 
 function CommodityStats:OnAdvancedSearch( wndHandler, wndControl, eMouseButton )
     self.plugins:InitSearchWindow(self.settings.latestSearch)
+end
+
+function CommodityStats:OnSelectGraphStyle( wndHandler, wndControl, eMouseButton )
+    local name = wndControl:GetName()
+    if name == "rboLineChart" then
+        self.settings.fillStyle = PixiePlot.LINEONLY
+    end
+    if name == "rboAreaChart" then
+        self.settings.fillStyle = PixiePlot.FILL
+    end
 end
 
 ---------------------------------------------------------------------------------------------------
