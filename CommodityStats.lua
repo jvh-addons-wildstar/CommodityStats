@@ -55,8 +55,7 @@ CommodityStats.Strategy = {
 CommodityStats.JobType = {
     CONVERTSTATISTICS = 0,
     CONVERTTRANSACTIONS = 1,
-    PURGEEXPIRED = 2,
-    AVERAGESTATS = 3,
+    PURGEANDAVERAGE = 2
 }
 
 -- Price groups
@@ -86,7 +85,7 @@ CommodityStats.transactions = {}
 CommodityStats.settings = {}
 CommodityStats.currentItemID = 0
 CommodityStats.queueSize = 0
-CommodityStats.lastAverageRun = 0
+CommodityStats.lastMaintenanceRun = 0
 CommodityStats.isScanning = false
 
 -- default values
@@ -366,41 +365,43 @@ function CommodityStats:OnRunJob()
             end
         end
 
-        if job.type == CommodityStats.JobType.PURGEEXPIRED then
+        if job.type == CommodityStats.JobType.PURGEANDAVERAGE then
             local itemid = job.data
-            local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
-            local timestamps = self.stats:GetAllStatsForItemId(itemid)
-            for timestamp, stat in pairs(timestamps) do
-                if timestamp <= minimumTime then
-                    self.stats:RemoveTimestamp(itemid, timestamp)
-                end
-            end
-        end
-
-        if job.type == CommodityStats.JobType.AVERAGESTATS then
-            local itemid = job.data
-            local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
-            local stats = self.stats:GetAllStatsForItemId(itemid)
-            if stats.earliest == nil then
-                local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
-                stats.earliest = earliest
-            end
-            while stats.earliest < treshold do
-                local firstStat = stats.earliest
-                local newStats = {}
-                while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
-                    local stat = self.stats:GetStatByItemIdAndTimestamp(itemid, stats.earliest)
-                    if stat ~= nil then
-                        table.insert(newStats, stat)
-                        self.stats:RemoveTimestamp(itemid, stats.earliest)
-                    end
-                    stats.earliest = stats.earliest + secondsInHour
-                end
-                if #newStats > 0 then
-                    self.stats.d[itemid].earliest = stats.earliest
-                    self.stats:SaveStat(itemid, AverageStats(newStats), true)
-                end
-            end
+            -- purge expired stats
+            if self.settings.daysToKeep > 0 then
+	            local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
+	            local stats = self.stats:GetAllStatsForItemId(itemid)
+	            for timestamp, stat in pairs(stats) do
+	                if timestamp <= minimumTime then
+	                    self.stats:RemoveTimestamp(itemid, timestamp)
+	                    stats[timestamp] = nil
+	                end
+	            end
+	        end
+	        -- average old stats
+	        if self.settings.daysUntilAverage > 0 then
+	        	local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
+	            if stats.earliest == nil then
+	                local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
+	                stats.earliest = earliest
+	            end
+	            while stats.earliest < treshold do
+	                local firstStat = stats.earliest
+	                local newStats = {}
+	                while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
+	                    local stat = stats[stats.earliest]
+	                    if stat ~= nil then
+	                        table.insert(newStats, stat)
+	                        self.stats:RemoveTimestamp(itemid, stats.earliest)
+	                    end
+	                    stats.earliest = stats.earliest + secondsInHour
+	                end
+	                if #newStats > 0 then
+	                    self.stats.d[itemid].earliest = stats.earliest
+	                    self.stats:SaveStat(itemid, AverageStats(newStats), true)
+	                end
+	            end
+	        end
         end
 
         table.remove(jobList, 1)
@@ -543,14 +544,14 @@ function CommodityStats:OnSave(eLevel)
         stats = self.stats.d,
         trans = self.trans.d,
         settings = self.settings,
-        lastAverageRun = self.lastAverageRun
+        lastMaintenanceRun = self.lastMaintenanceRun
     }
     return save
 end
 
 function CommodityStats:OnRestore(eLevel, tData)
     self.transactions = tData.transactions or {}
-    self.lastAverageRun = tData.lastAverageRun or 0
+    self.lastMaintenanceRun = tData.lastMaintenanceRun or 0
     self.statistics = tData.statistics or nil
     self.stats:LoadData(tData.stats or {})
     self.trans:LoadData(tData.trans or {})
@@ -574,10 +575,16 @@ function CommodityStats:OnRestore(eLevel, tData)
             self.processingTimer:Start()
             return
         else
-            self:PurgeExpiredStats()
-            --self:AverageStatistics()
-            jobFullSize = #jobList
-            self.processingTimer:Start()
+        	if (os.time() - self.lastMaintenanceRun) > secondsInDay and (self.settings.daysToKeep > 0 or self.settings.daysUntilAverage > 0) then
+	            for itemid, item in pairs(self.stats.d) do
+		            if type(itemid) == 'number' or index == CREDDid then
+		                table.insert(jobList, { type = CommodityStats.JobType.PURGEANDAVERAGE, data = itemid })
+		            end
+		        end
+	            jobFullSize = #jobList
+	            self.processingTimer:Start()
+	            self.lastMaintenanceRun = os.time()
+	        end
         end
     end
 end
@@ -822,24 +829,20 @@ function CommodityStats:GetValueBoundaries(t)
 end
 
 function CommodityStats:PurgeExpiredStats()
-    if self.settings.daysToKeep > 0 then
-        for itemid, item in pairs(self.stats.d) do
-            if type(itemid) == 'number' or index == CREDDid then
-                table.insert(jobList, { type = CommodityStats.JobType.PURGEEXPIRED, data = itemid })
-            end
-        end
-    end
+    -- if self.settings.daysToKeep > 0 then
+        
+    -- end
 end
 
 function CommodityStats:AverageStatistics()
-	if self.settings.daysUntilAverage > 0 and (os.time() - self.lastAverageRun) > secondsInDay then
-		for itemid, stats in pairs(self.stats.d) do 
-            if type(itemid) == 'number' or index == CREDDid then
-                table.insert(jobList, { type = CommodityStats.JobType.AVERAGESTATS, data = itemid })
-            end
-            self.lastAverageRun = os.time()
-		end
-	end
+	-- if self.settings.daysUntilAverage > 0 and (os.time() - self.lastMaintenanceRun) > secondsInDay then
+	-- 	for itemid, stats in pairs(self.stats.d) do 
+ --            if type(itemid) == 'number' or index == CREDDid then
+ --                table.insert(jobList, { type = CommodityStats.JobType.AVERAGESTATS, data = itemid })
+ --            end
+ --            self.lastMaintenanceRun = os.time()
+	-- 	end
+	-- end
 end
 
 function CommodityStats:LoadTransactionsForm()
