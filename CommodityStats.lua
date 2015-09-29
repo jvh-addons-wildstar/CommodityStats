@@ -367,40 +367,42 @@ function CommodityStats:OnRunJob()
 
         if job.type == CommodityStats.JobType.PURGEANDAVERAGE then
             local itemid = job.data
+            local stats = self.stats:GetAllStatsForItemId(itemid)
             -- purge expired stats
             if self.settings.daysToKeep > 0 then
 	            local minimumTime = GetTime() - (self.settings.daysToKeep * secondsInDay)
-	            local stats = self.stats:GetAllStatsForItemId(itemid)
 	            for timestamp, stat in pairs(stats) do
-	                if timestamp <= minimumTime then
-	                    self.stats:RemoveTimestamp(itemid, timestamp)
-	                    stats[timestamp] = nil
-	                end
+                    if type(timestamp) == 'number' then
+    	                if timestamp <= minimumTime then
+    	                    self.stats:RemoveTimestamp(itemid, timestamp)
+    	                    stats[timestamp] = nil
+    	                end
+                    end
 	            end
 	        end
 	        -- average old stats
 	        if self.settings.daysUntilAverage > 0 then
-	        	local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
-	            if stats.earliest == nil then
-	                local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
-	                stats.earliest = earliest
-	            end
-	            while stats.earliest < treshold do
-	                local firstStat = stats.earliest
-	                local newStats = {}
-	                while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
-	                    local stat = stats[stats.earliest]
-	                    if stat ~= nil then
-	                        table.insert(newStats, stat)
-	                        self.stats:RemoveTimestamp(itemid, stats.earliest)
-	                    end
-	                    stats.earliest = stats.earliest + secondsInHour
-	                end
-	                if #newStats > 0 then
-	                    self.stats.d[itemid].earliest = stats.earliest
-	                    self.stats:SaveStat(itemid, AverageStats(newStats), true)
-	                end
-	            end
+	        	-- local treshold = GetTime() - (secondsInDay * self.settings.daysUntilAverage)
+	         --    if stats.earliest == nil then
+	         --        local earliest, minPrice, maxPrice = self:GetValueBoundaries(stats)
+	         --        stats.earliest = earliest
+	         --    end
+	         --    while stats.earliest < treshold do
+	         --        local firstStat = stats.earliest
+	         --        local newStats = {}
+	         --        while stats.earliest < firstStat + secondsInDay and stats.earliest < treshold do
+	         --            local stat = stats[stats.earliest]
+	         --            if stat ~= nil then
+	         --                table.insert(newStats, stat)
+	         --                self.stats:RemoveTimestamp(itemid, stats.earliest)
+	         --            end
+	         --            stats.earliest = stats.earliest + secondsInHour
+	         --        end
+	         --        if #newStats > 0 then
+	         --            self.stats.d[itemid].earliest = stats.earliest
+	         --            self.stats:SaveStat(itemid, AverageStats(newStats), true)
+	         --        end
+	         --    end
 	        end
         end
 
@@ -1237,6 +1239,7 @@ end
 function CommodityStats:OnSettingsSave(wndHandler, wndControl, eMouseButton)
     self.settings.daysToKeep = tonumber(self.wndConfig:FindChild("txtStatisticsAge"):GetText())
     self.settings.daysUntilAverage = tonumber(self.wndConfig:FindChild("txtStatisticsAverage"):GetText())
+    self.lastMaintenanceRun = os.time() - (secondsInDay + 1)
     wndControl:SetText(L["Saved!"])
 end
 
