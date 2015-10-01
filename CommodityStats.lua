@@ -105,7 +105,6 @@ CommodityStats.settings = {
 	lastSelectedTab = nil
 }
 
-		
 local secondsInDay = 86400
 local secondsInHour = 3600
 local clrSellTop1 = {a=1,r=1,g=0,b=0}
@@ -137,7 +136,6 @@ function CommodityStats:OnInitialize()
 
     self.Xml = XmlDoc.CreateFromFile("CommodityStats.xml")
     self.wndMain = Apollo.LoadForm(self.Xml, "MainContainer", nil, self)
-    Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "CommodityStats_Main"})
     GeminiLocale:TranslateWindow(L, self.wndMain)
 
     self.plugins = Apollo.GetPackage("CommodityStats:PluginManager").tPackage.Init(self)
@@ -343,7 +341,7 @@ function CommodityStats:OnRunJob()
         jobRunning = true
 
         local job = jobList[1]
-        local message = "CommodityStats is optimizing data, please wait..."
+        local message = "CommodityStats is checking data, please wait..."
 
         if job.type == CommodityStats.JobType.CONVERTSTATISTICS then
             local itemid = job.data
@@ -408,7 +406,7 @@ function CommodityStats:OnRunJob()
 
         table.remove(jobList, 1)
         local progress = (jobFullSize - #jobList) / jobFullSize
-        Event_FireGenericEvent("ReportProgress", message, progress, true)
+        Event_FireGenericEvent("ReportProgress", message, progress, false)
 
         if #jobList == 0 then
              Event_FireGenericEvent("JobFinished", job.type)
@@ -534,7 +532,8 @@ function CommodityStats:CreateCommodityStat(tStats)
 end
 
 function CommodityStats:OnWindowManagementReady()
-    Event_FireGenericEvent("WindowManagementRegister", {strName = CommodityStats_Main, nSaveVersion=3})
+    Event_FireGenericEvent("WindowManagementRegister", {strName = "CommodityStats_Main", nSaveVersion="1"})
+    Event_FireGenericEvent("WindowManagementAdd", {wnd = self.wndMain, strName = "CommodityStats_Main", nSaveVersion = "1"})
 end
 
 function CommodityStats:OnSave(eLevel)
