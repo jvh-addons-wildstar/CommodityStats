@@ -34,7 +34,7 @@ function Statistics.Init()
 	function self:GetLatestStatForItemid(itemid)
 		if self.d[itemid] ~= nil then
 			local line = trim(string.match(self.d[itemid].data, Pattern.LatestStat))
-			if line == "" then
+			if line == "" or line == nil then
 				return nil
 			end
 
