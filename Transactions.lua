@@ -24,7 +24,6 @@ function Transactions.Init()
 
 			for line in lines do
 				local transaction = stringToTransaction(line)
-				SendVarToRover("Transaction", transaction)
 				transactions[transaction.timestamp] = transaction
 			end
 		end
