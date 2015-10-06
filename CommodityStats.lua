@@ -126,7 +126,7 @@ function CommodityStats:OnInitialize()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.INFO,
+        level = GeminiLogging.WARN,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -1157,7 +1157,7 @@ function CommodityStats:Singularize(s)
     local words = { "rune", "bar", "bone", "core", "fragment", "scrap", "sign", "pelt", "chunk", "leather", "dye", "charge", "injector", "pummelgranate", "roast", "breast", "melon",
                     "boost", "stimulant", "potion", "cloth", "grenade", "juice", "serum", "extract", "leave", "disruptor", "emitter", "focuser", "spirovine", "root", "medishot",
                     "transformer", "acceleron", "ingot", "coralscale", "zephyrite", "sample", "faerybloom", "sapphire", "yellowbell", "amp", "shadeslate", "novacite", "essence",
-                    "starshard", "hydrogem", "bloodbriar", "diamond", "wheat", "octopod", "risotto"}
+                    "starshard", "hydrogem", "bloodbriar", "diamond", "wheat", "octopod", "risotto","air","earth","fire","fusion","logic","water"}
     s = s:lower()
     for i, word in pairs(words) do
         s = s:gsub(word .. "s", word)
