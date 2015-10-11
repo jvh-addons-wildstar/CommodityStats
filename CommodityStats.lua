@@ -145,7 +145,7 @@ function CommodityStats:OnInitialize()
     self.MarketplaceCommodity = Apollo.GetAddon("MarketplaceCommodity")
     self.MarketplaceCREDD = Apollo.GetAddon("MarketplaceCREDD")
 
-    self.SupplySatchel = Apollo.GetAddon("SupplySatchel")
+    self.SupplySatchel = Apollo.GetAddon("SupplySatchel") or Apollo.GetAddon("KuronaSatchel")
 
     self.messageTimer = ApolloTimer.Create(3, true, "OnClearMessageTimer", self)
     self.messageTimer:Stop()
@@ -171,6 +171,8 @@ function CommodityStats:InitializeHooks()
 
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
     self:RawHook(self.MarketplaceCommodity, "OnPostCustomMessage")
+
+    --self:RawHook(self.SupplySatchel, "OnInitializeSatchelPart2")
 
     -- tooltip content
     local tooltips = Apollo.GetAddon("ToolTips") or Apollo.GetAddon("VikingTooltips")
@@ -272,6 +274,58 @@ function CommodityStats:OnCommodityInfoResults(luaCaller, nItemId, tStats, tOrde
     end
 end
 
+function CommodityStats:OnInitializeSatchelPart2(luaCaller)
+    local knEmptyThreshold = 0
+    local knFullThreshold = 250
+    local knMediumThreshold = knFullThreshold * .90
+    local bShow = luaCaller.wndMain:FindChild("ShowAllBtn"):IsChecked()
+    for strCategory, arItems in pairs(GameLib.GetPlayerUnit():GetSupplySatchelItems(0)) do
+        local wndCat = Apollo.LoadForm(luaCaller.xmlDoc, "Category", luaCaller.wndCategoryList, luaCaller)
+        wndCat:FindChild("CategoryText"):SetText(strCategory)
+
+        luaCaller.tItemCache[strCategory] = {}
+
+        local tCacheCategory = luaCaller.tItemCache[strCategory]
+        tCacheCategory.wndCat = wndCat
+        tCacheCategory.arItems = arItems
+        tCacheCategory.nVisibleItems = 0
+
+        for idx, tCurrItem in ipairs(tCacheCategory.arItems) do
+            local wndItem = Apollo.LoadForm(luaCaller.xmlDoc, "Item", wndCat:FindChild("ItemList"), luaCaller)
+            wndItem:Show(bShow)
+            wndItem:SetData(tCurrItem)
+            wndItem:FindChild("Icon"):SetSprite(tCurrItem.itemMaterial:GetIcon())
+            wndItem:FindChild("Icon"):GetWindowSubclass():SetItem(tCurrItem.itemMaterial)
+            if tCurrItem.nCount == knFullThreshold then
+                wndItem:FindChild("HighCountWarnFrame"):Show(true)
+                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount).."\n/"..knFullThreshold)
+                wndItem:FindChild("Count"):SetTextColor(kclrRed)
+            elseif tCurrItem.nCount >= knMediumThreshold then
+                wndItem:FindChild("HighCountWarnFrame"):Show(true)
+                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount).."\n/"..knFullThreshold)
+                wndItem:FindChild("Count"):SetTextColor(kclrOrange)
+            elseif tCurrItem.nCount > knEmptyThreshold then
+                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount))
+                wndItem:FindChild("Count"):SetTextColor(kclrWhite)
+            else
+                wndItem:FindChild("Icon"):SetBGColor(kclrGray)
+            end
+            --Tooltip.GetItemTooltipForm(luaCaller, wndItem, tCurrItem.itemMaterial, {bPrimary = true, bSelling = false, nStackCount = tCurrItem.nCount}
+            wndItem:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P>", tCurrItem.itemMaterial:GetName()))
+            if bShow then
+                tCacheCategory.nVisibleItems = tCacheCategory.nVisibleItems + 1
+            end
+
+            tCurrItem.wndItem = wndItem
+        end
+    end
+
+    luaCaller:OnResize()
+    luaCaller:PopulateSatchel(false)
+end
+
+
+
 function CommodityStats:OnCommodityInfoResultsNative(nItemId, tStats, tOrders)
     glog:debug("Commodity info received for item ID " .. tostring(nItemId) .. ".")
     local stat = self:CreateCommodityStat(tStats)
@@ -294,6 +348,7 @@ function CommodityStats:CreateCallNames(luaCaller)
     Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
         wndControl:SetTooltipDoc(nil)
         local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
+        -- and wndControl:FindChild("NewSatchelItemRunner") == nil
         if (wndTooltip ~= nil) and item:IsCommodity() then
             local itemID = item:GetItemId()
             local latestValues = self.stats:GetLatestStatForItemid(itemID)
@@ -1034,6 +1089,9 @@ function CommodityStats:OnMailboxOpen()
 end
 
 function CommodityStats:DisplayTransactions(itemID)
+    if self.wndTransactions == nil then
+        self:LoadTransactionsForm()
+    end
     for i, listitem in ipairs(transactionListItems) do
         listitem:Destroy()
     end
@@ -1042,16 +1100,16 @@ function CommodityStats:DisplayTransactions(itemID)
     local sellTotal = 0
     local buyQuantity = 0
     local sellQuantity = 0
-
     local wndItems = self.wndTransactions:FindChild("ItemList")
     if itemID == nil then
-        -- for id, transactions in self.trans:GetAllTransactionsForItemId() do
-        --     for i, transaction in ipairs(self.transactions[id]) do
-        --         table.insert(transactionListItems, self:AddTransactionItem(wndItems, id, transaction))
-        --     end
-        -- end
+        for itemid, item in pairs(self.trans.d) do
+            for id, transaction in pairs(self.trans:GetAllTransactionsForItemId(itemid)) do
+                table.insert(transactionListItems, self:AddTransactionItem(wndItems, itemid, transaction))
+            end
+        end
+        self.wndMain:Show(true)
     else
-        for i, transaction in pairs(self.trans:GetAllTransactionsForItemId(itemID)) do
+        for id, transaction in pairs(self.trans:GetAllTransactionsForItemId(itemID)) do
             if transaction.result == CommodityStats.Result.BUYSUCCESS then 
                 buyQuantity = buyQuantity + transaction.quantity
                 buyTotal = buyTotal + (transaction.quantity * transaction.price)
@@ -1094,6 +1152,7 @@ function CommodityStats:AddTransactionItem(wndTarget, itemID, transaction)
     wndTransaction:FindChild("txtQuantity"):SetText(tostring(transaction.quantity))
     wndTransaction:FindChild("monPrice"):SetAmount(transaction.price)
     wndTransaction:FindChild("txtResult"):SetText(result)
+    wndTransaction:SetTooltip(Item.GetDataFromId(itemID):GetName())
     return wndTransaction
 end
 
