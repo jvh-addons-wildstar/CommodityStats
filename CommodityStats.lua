@@ -172,8 +172,6 @@ function CommodityStats:InitializeHooks()
     -- Use a non-blocking infobox to display the transaction result info (no more waiting 4 seconds between every buy/sell attempt)
     self:RawHook(self.MarketplaceCommodity, "OnPostCustomMessage")
 
-    --self:RawHook(self.SupplySatchel, "OnInitializeSatchelPart2")
-
     -- tooltip content
     local tooltips = Apollo.GetAddon("ToolTips") or Apollo.GetAddon("VikingTooltips")
     if tooltips ~= nil then
@@ -273,58 +271,6 @@ function CommodityStats:OnCommodityInfoResults(luaCaller, nItemId, tStats, tOrde
         Apollo.LoadForm(self.Xml, "ListSubmitButtonOverlay", listSubmitBtn, self)
     end
 end
-
-function CommodityStats:OnInitializeSatchelPart2(luaCaller)
-    local knEmptyThreshold = 0
-    local knFullThreshold = 250
-    local knMediumThreshold = knFullThreshold * .90
-    local bShow = luaCaller.wndMain:FindChild("ShowAllBtn"):IsChecked()
-    for strCategory, arItems in pairs(GameLib.GetPlayerUnit():GetSupplySatchelItems(0)) do
-        local wndCat = Apollo.LoadForm(luaCaller.xmlDoc, "Category", luaCaller.wndCategoryList, luaCaller)
-        wndCat:FindChild("CategoryText"):SetText(strCategory)
-
-        luaCaller.tItemCache[strCategory] = {}
-
-        local tCacheCategory = luaCaller.tItemCache[strCategory]
-        tCacheCategory.wndCat = wndCat
-        tCacheCategory.arItems = arItems
-        tCacheCategory.nVisibleItems = 0
-
-        for idx, tCurrItem in ipairs(tCacheCategory.arItems) do
-            local wndItem = Apollo.LoadForm(luaCaller.xmlDoc, "Item", wndCat:FindChild("ItemList"), luaCaller)
-            wndItem:Show(bShow)
-            wndItem:SetData(tCurrItem)
-            wndItem:FindChild("Icon"):SetSprite(tCurrItem.itemMaterial:GetIcon())
-            wndItem:FindChild("Icon"):GetWindowSubclass():SetItem(tCurrItem.itemMaterial)
-            if tCurrItem.nCount == knFullThreshold then
-                wndItem:FindChild("HighCountWarnFrame"):Show(true)
-                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount).."\n/"..knFullThreshold)
-                wndItem:FindChild("Count"):SetTextColor(kclrRed)
-            elseif tCurrItem.nCount >= knMediumThreshold then
-                wndItem:FindChild("HighCountWarnFrame"):Show(true)
-                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount).."\n/"..knFullThreshold)
-                wndItem:FindChild("Count"):SetTextColor(kclrOrange)
-            elseif tCurrItem.nCount > knEmptyThreshold then
-                wndItem:FindChild("Count"):SetText(tostring(tCurrItem.nCount))
-                wndItem:FindChild("Count"):SetTextColor(kclrWhite)
-            else
-                wndItem:FindChild("Icon"):SetBGColor(kclrGray)
-            end
-            --Tooltip.GetItemTooltipForm(luaCaller, wndItem, tCurrItem.itemMaterial, {bPrimary = true, bSelling = false, nStackCount = tCurrItem.nCount}
-            wndItem:SetTooltip(string.format("<P Font=\"CRB_InterfaceSmall\">%s</P>", tCurrItem.itemMaterial:GetName()))
-            if bShow then
-                tCacheCategory.nVisibleItems = tCacheCategory.nVisibleItems + 1
-            end
-
-            tCurrItem.wndItem = wndItem
-        end
-    end
-
-    luaCaller:OnResize()
-    luaCaller:PopulateSatchel(false)
-end
-
-
 
 function CommodityStats:OnCommodityInfoResultsNative(nItemId, tStats, tOrders)
     glog:debug("Commodity info received for item ID " .. tostring(nItemId) .. ".")
