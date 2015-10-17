@@ -346,10 +346,8 @@ end
 function CommodityStats:CreateCallNames(luaCaller)
     local origItemTooltip = Tooltip.GetItemTooltipForm
     Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
-        wndControl:SetTooltipDoc(nil)
         local wndTooltip, wndTooltipComp = origItemTooltip(luaCaller, wndControl, item, bStuff, nCount)
-        -- and wndControl:FindChild("NewSatchelItemRunner") == nil
-        if (wndTooltip ~= nil) and item:IsCommodity() then
+        if (wndTooltip ~= nil) and item:IsCommodity() and wndControl:FindChild("NewSatchelItemRunner") == nil then
             local itemID = item:GetItemId()
             local latestValues = self.stats:GetLatestStatForItemid(itemID)
             if latestValues then
@@ -369,8 +367,9 @@ function CommodityStats:CreateCallNames(luaCaller)
                     wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
                 end
             end
-        end
+        --end
         return wndTooltip, wndTooltipComp
+    end
     end
 end
 
