@@ -313,9 +313,8 @@ function CommodityStats:CreateCallNames(luaCaller)
                     wndTooltip:SetAnchorOffsets(nLeft, nTop, nRight, nBottom + (eBottom - eTop - offset))
                 end
             end
-        --end
+        end
         return wndTooltip, wndTooltipComp
-    end
     end
 end
 
@@ -1097,7 +1096,7 @@ function CommodityStats:AddTransactionItem(wndTarget, itemID, transaction)
     wndTransaction:FindChild("txtQuantity"):SetText(tostring(transaction.quantity))
     wndTransaction:FindChild("monPrice"):SetAmount(transaction.price)
     wndTransaction:FindChild("txtResult"):SetText(result)
-    wndTransaction:SetTooltip(Item.GetDataFromId(itemID):GetName())
+    --wndTransaction:SetTooltip(Item.GetDataFromId(itemID):GetName())
     return wndTransaction
 end
 
