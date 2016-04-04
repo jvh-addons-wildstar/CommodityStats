@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="boe2" APIVersion="11" Name="CommodityStats" Description="Keep track of prices on the commodity exchange">
+<Addon Author="boe2" APIVersion="12" Name="CommodityStats" Description="Keep track of prices on the commodity exchange">
     <Script Name="libs\GeminiLogging\GeminiLogging.lua" />
     <Script Name="libs\GeminiLocale\GeminiLocale.lua" />
     <Script Name="libs\GeminiHook\GeminiHook-1.0.lua" />

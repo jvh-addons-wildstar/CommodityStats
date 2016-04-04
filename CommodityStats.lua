@@ -126,7 +126,7 @@ function CommodityStats:OnInitialize()
     PixiePlot = Apollo.GetPackage("Drafto:Lib:PixiePlot-1.4").tPackage
     GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
     glog = GeminiLogging:GetLogger({
-        level = GeminiLogging.WARN,
+        level = GeminiLogging.INFO,
         pattern = "%d %n %c %l - %m",
         appender = "GeminiConsole"
     })
@@ -193,10 +193,10 @@ function CommodityStats:Initialize(luaCaller)
 
     if luaCaller == self.MarketplaceCommodity then
         if self.ScanButton ~= nil then self.ScanButton:Destroy() end
-        self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", luaCaller.wndMain, self)
+        self.ScanButton = Apollo.LoadForm(self.Xml, "ScanButton", luaCaller.tWndRefs.wndMain, self)
         self.ScanButton:SetText(L["Scan all data"])
         if self.plugins:GetPluginCount() > 0 then
-            local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", luaCaller.wndMain, self)
+            local searchButton = Apollo.LoadForm(self.Xml, "AdvancedSearchButton", luaCaller.tWndRefs.wndMain, self)
             searchButton:SetText(L["Search"])
         end
         -- Get CREDD info separately since it's not part of the CX, but we want the history on it.
@@ -215,7 +215,7 @@ function CommodityStats:OnCancelBtn(luaCaller, wndHandler, wndControl)
 end
 
 function CommodityStats:OnHeaderBtnToggle(luaCaller)
-    local children = luaCaller.wndMain:FindChild("MainScrollContainer"):GetChildren()
+    local children = luaCaller.tWndRefs.wndMain:FindChild("MainScrollContainer"):GetChildren()
     for i, child in ipairs(children) do
         if child:GetText() == "" then
             local stat = Apollo.LoadForm(self.Xml, "StatButton", child, self)
@@ -225,8 +225,8 @@ function CommodityStats:OnHeaderBtnToggle(luaCaller)
 end
 
 function CommodityStats:OnCommodityInfoResults(luaCaller, nItemId, tStats, tOrders)
-    if luaCaller == self.MarketplaceCommodity and luaCaller.wndMain ~= nil then
-        local scrollContainer = luaCaller.wndMain:FindChild("MainScrollContainer")
+    if luaCaller == self.MarketplaceCommodity and luaCaller.tWndRefs.wndMain ~= nil then
+        local scrollContainer = luaCaller.tWndRefs.wndMain:FindChild("MainScrollContainer")
         if not scrollContainer then return end
         local wndMatch = scrollContainer:FindChild(nItemId)
         if not wndMatch or not wndMatch:IsValid() then
@@ -456,17 +456,17 @@ function CommodityStats:OnListSubmitBtn( wndHandler, wndControl, eMouseButton, n
         local wndParent = wndHandler:GetData()[2]
         self[containername] = {}
         self[containername].lastItemID = tCurrItem:GetItemId()
-        self[containername].lastPricePerUnit = wndParent:FindChild("ListInputPrice"):GetCurrency()
+        self[containername].lastPricePerUnit = wndParent:FindChild("ListInputPrice"):GetAmount()
         self[containername].lastQuantity = wndParent:FindChild("ListInputNumber"):GetText()
-        self[containername].lastScrollPos = self.MarketplaceCommodity.wndMain:FindChild("MainScrollContainer"):GetVScrollPos()
+        self[containername].lastScrollPos = self.MarketplaceCommodity.tWndRefs.wndMain:FindChild("MainScrollContainer"):GetVScrollPos()
     end
 end
 
 function CommodityStats:GetSelectedCategory(tMarketPlaceCommodity)
-    if tMarketPlaceCommodity.wndMain:FindChild("HeaderSellOrderBtn"):IsChecked() then return CommodityStats.Category.SELLORDER end
-    if tMarketPlaceCommodity.wndMain:FindChild("HeaderBuyOrderBtn"):IsChecked() then return CommodityStats.Category.BUYORDER end
-    if tMarketPlaceCommodity.wndMain:FindChild("HeaderSellNowBtn"):IsChecked() then return CommodityStats.Category.SELLNOW end
-    if tMarketPlaceCommodity.wndMain:FindChild("HeaderBuyNowBtn"):IsChecked() then return CommodityStats.Category.BUYNOW end
+    if tMarketPlaceCommodity.tWndRefs.wndMain:FindChild("HeaderSellOrderBtn"):IsChecked() then return CommodityStats.Category.SELLORDER end
+    if tMarketPlaceCommodity.tWndRefs.wndMain:FindChild("HeaderBuyOrderBtn"):IsChecked() then return CommodityStats.Category.BUYORDER end
+    if tMarketPlaceCommodity.tWndRefs.wndMain:FindChild("HeaderSellNowBtn"):IsChecked() then return CommodityStats.Category.SELLNOW end
+    if tMarketPlaceCommodity.tWndRefs.wndMain:FindChild("HeaderBuyNowBtn"):IsChecked() then return CommodityStats.Category.BUYNOW end
     return nil
 end
 
